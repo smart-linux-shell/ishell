@@ -2,8 +2,11 @@ import urwid
 import subprocess
 
 palette = [
-    ('focused', 'black', 'light gray'),
-    ('unfocused', 'light gray', 'black')
+    ('focused', 'white', 'dark gray'),
+    ('unfocused', 'light gray', 'black'),
+    ('assistant_prompt', 'light green', 'black'),
+    ('bash_prompt', 'light cyan', 'black'),
+    ('focused_prompt', 'yellow', 'dark gray'),
 ]
 
 class CustomWidget(urwid.WidgetWrap):
@@ -14,7 +17,7 @@ class CustomWidget(urwid.WidgetWrap):
         self.current_command = ""
         self.continuing = False
 
-        self.user = urwid.Edit(self.name.lower() + "> ")
+        self.user = urwid.Edit((f"{name.lower()}_prompt", self.name.lower() + "> "))
         self.output = urwid.Text("")
         self.listbox_content = [self.output, self.user]
         self.listbox = urwid.ListBox(urwid.SimpleFocusListWalker(self.listbox_content))
@@ -103,12 +106,16 @@ class MainFrame(urwid.Frame):
             return False
 
     def update_focus(self):
-        for col in self.columns.contents:
-            for pile in col[0].contents:
-                pile[0].set_attr_map({None: 'unfocused'})
+        for frame in self.frames:
+            frame.box.set_attr_map({None: 'unfocused'})
+            frame.user.set_caption((f"{frame.name.lower()}_prompt", frame.name.lower() + "> "))
+
         col = self.columns.focus_position
         row = self.columns.contents[col][0].focus_position
-        self.columns.contents[col][0].contents[row][0].set_attr_map({None: 'focused'})
+        focused_frame = self.frames[col * 2 + row]
+
+        focused_frame.box.set_attr_map({None: 'focused'})
+        focused_frame.user.set_caption(('focused_prompt', focused_frame.name.lower() + "> "))
 
     def selectable_click(self, widget, size, key):
         idx = 0
