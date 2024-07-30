@@ -1,0 +1,21 @@
+name: Server Build & Push
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build_and_push:
+    runs-on: self-hosted
+    steps:
+      - name: Clone repo and run
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            cd ishell && ./down.sh && git pull ||
+            git clone git@github.com:smart-linux-shell/ishell.git ishell && cd ishell;
+            ./up.sh
