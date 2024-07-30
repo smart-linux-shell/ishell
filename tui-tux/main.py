@@ -1,36 +1,39 @@
 import urwid
 import subprocess
 
-# Define colors
 palette = [
     ('focused', 'black', 'light gray'),
     ('unfocused', 'light gray', 'black')
 ]
 
-class CustomWidget(urwid.Edit):
+class CustomWidget(urwid.WidgetWrap):
 
     def __init__(self, name, select_callback):
-        super().__init__()
-
         self.name = name
         self.commands_history = []
         self.current_command = ""
         self.continuing = False
 
         self.user = urwid.Edit(self.name.lower() + "> ")
-        self.frame = urwid.AttrMap(urwid.LineBox(self.user), 'unfocused')
-        self.box = urwid.AttrMap(urwid.LineBox(self.user, title=name.capitalize()), 'unfocused')
+        self.output = urwid.Text("")
+        self.listbox_content = [self.output, self.user]
+        self.listbox = urwid.ListBox(urwid.SimpleFocusListWalker(self.listbox_content))
+        self.box = urwid.AttrMap(urwid.LineBox(self.listbox, title=name.capitalize()), 'unfocused')
 
-        self.selectable_icon = urwid.SelectableIcon('', 0)
+        self.frame = urwid.AttrMap(urwid.LineBox(self.listbox), 'unfocused')
         self.frame.keypress = select_callback
+
+        super().__init__(self.frame)
 
     def execute_command(self):
         command = self.user.edit_text.strip()
+        self.commands_history.append(command)
+        self.user.set_edit_text("")  # Clear the input field after reading the command
 
         if command.endswith('\\'):
             self.current_command += command
             self.continuing = True
-            self.user.set_edit_text(self.current_command + "\n")
+            self.user.set_edit_text(self.current_command)
         else:
             if self.continuing:
                 command = self.current_command + command
@@ -41,21 +44,38 @@ class CustomWidget(urwid.Edit):
             except subprocess.CalledProcessError as e:
                 result = e.output
 
-            self.display_result(result)
+            self.display_result(command, result)
 
-    def display_result(self, result):
-        self.user.set_edit_text(self.user.edit_text + "\n" + result + "\n" + self.user.edit_text[:self.user.edit_pos])
+    def display_result(self, command, result):
+        self.output.set_text(self.output.text + "\n" + self.name.lower() + "> " + command + "\n" + result)
 
 
 class MainFrame(urwid.Frame):
     def __init__(self):
         self.frames = [CustomWidget("assistant", self.selectable_click), CustomWidget("bash", self.selectable_click)]
-        self.pile = urwid.Pile([])
+        self.columns = urwid.Columns([])
         self.init_layout()
-        super().__init__(self.pile)
+        super().__init__(self.columns)
 
     def init_layout(self):
-        self.pile.contents = [(frame.box, self.pile.options('weight', 1)) for frame in self.frames]
+        columns = []
+        column_frames = []
+
+        # Group frames into columns
+        for i, frame in enumerate(self.frames):
+            if i % 2 == 0:
+                column_frames = [frame]
+            else:
+                column_frames.append(frame)
+                columns.append(urwid.Pile([urwid.AttrMap(f.box, None, focus_map='focused') for f in column_frames]))
+                column_frames = []
+
+        # If there's an odd frame out, it gets its own full-height column
+        if column_frames:
+            columns.append(urwid.Pile([urwid.AttrMap(f.box, None, focus_map='focused') for f in column_frames]))
+
+        # Set the columns layout
+        self.columns.contents = [(col, self.columns.options('weight', 1)) for col in columns]
         self.update_focus()
 
     def add_frame(self, name):
@@ -68,22 +88,27 @@ class MainFrame(urwid.Frame):
 
     def handle_input(self, key):
         if key in ('shift tab', 'ctrl shift tab'):
-            self.pile.focus_position = (self.pile.focus_position + (1 if key == 'shift tab' else -1)) % len(self.frames)
+            self.columns.focus_position = (self.columns.focus_position + (1 if key == 'shift tab' else -1)) % len(self.columns.contents)
             self.update_focus()
         elif key == 'enter':
-            self.frames[self.pile.focus_position].execute_command()
+            col = self.columns.focus_position
+            row = self.columns.contents[col][0].focus_position
+            self.frames[col * 2 + row].execute_command()
         elif key == 'ctrl t':
             self.add_frame('bash')
         elif key == 'ctrl x':
             if len(self.frames) > 1:
-                self.remove_frame(self.pile.focus_position)
+                self.remove_frame(self.columns.focus_position * 2 + self.columns.contents[self.columns.focus_position][0].focus_position)
         else:
             return False
 
     def update_focus(self):
-        for frame in self.frames:
-            frame.frame.set_attr_map({None: 'unfocused'})
-        self.frames[self.pile.focus_position].frame.set_attr_map({None: 'focused'})
+        for col in self.columns.contents:
+            for pile in col[0].contents:
+                pile[0].set_attr_map({None: 'unfocused'})
+        col = self.columns.focus_position
+        row = self.columns.contents[col][0].focus_position
+        self.columns.contents[col][0].contents[row][0].set_attr_map({None: 'focused'})
 
     def selectable_click(self, widget, size, key):
         idx = 0
@@ -91,7 +116,10 @@ class MainFrame(urwid.Frame):
             if self.frames[i].frame == widget:
                 idx = i
         if key == 'mouse press':
-            self.pile.focus_position = idx
+            col = idx // 2
+            row = idx % 2
+            self.columns.focus_position = col
+            self.columns.contents[col][0].focus_position = row
             self.update_focus()
         else:
             return False
