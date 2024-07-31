@@ -5,7 +5,7 @@ name: Build .deb
       - main
 jobs:
   build_deb:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Make app
@@ -27,4 +27,4 @@ jobs:
           cp control ishell_${VERSION}_amd64/DEBIAN/
       - name: Build deb
         working-directory: ./client
-        run: dpkg --build ishell_0.0.1_amd64/
+        run: dpkg --build ishell_${VERSION}_amd64/
