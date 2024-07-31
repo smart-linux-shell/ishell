@@ -1,0 +1,30 @@
+name: Build .deb
+'on':
+  push:
+    branches:
+      - main
+jobs:
+  build_deb:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make app
+        working-directory: ./client 
+        run: make
+      - name: Find version
+        working-directory: ./client
+        run: echo "VERSION=$(cat control | grep Version | cut -d' ' -f2)" >> $GITHUB_ENV
+      - name: Create deb directory structure
+        working-directory: ./client
+        run: |
+          mkdir ishell_${VERSION}_amd64;
+          mkdir -p ishell_${VERSION}_amd64/usr/bin;
+          mkdir ishell_${VERSION}_amd64/DEBIAN
+      - name: Copy files
+        working-directory: ./client
+        run: |
+          cp ishell ishell_${VERSION}_amd64/usr/bin/;
+          cp control ishell_${VERSION}_amd64/DEBIAN/
+      - name: Build deb
+        working-directory: ./client
+        run: dpkg --build ishell_0.0.1_amd64/

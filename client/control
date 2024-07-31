@@ -1,0 +1,7 @@
+Package: ishell
+Version: 0.0.1
+Maintainer: example <example@example.com>
+Depends: libc6
+Architecture: amd64
+Homepage: http://example.com
+Description: An example program.
