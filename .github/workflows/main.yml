@@ -7,7 +7,9 @@ jobs:
   build_deb:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+        
       - name: Make app
         working-directory: ./client 
         run: make
@@ -28,3 +30,10 @@ jobs:
       - name: Build deb
         working-directory: ./client
         run: dpkg --build ishell_${VERSION}_amd64/
+        
+      - name: Install snapcraft
+        uses: samuelmeuli/action-snapcraft@v2
+        
+      - name: Create snap file
+        working-directory: ./client
+        run: snapcraft

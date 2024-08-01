@@ -1,0 +1,16 @@
+name: ishell
+version: '0.0.1'
+base: core22
+confinement: strict
+summary: Example summary
+description: |
+  Example description
+  
+parts:
+  ishell:
+    source: .
+    plugin: make
+    
+apps:
+  ishell:
+    command: /usr/bin/ishell
