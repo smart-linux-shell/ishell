@@ -35,3 +35,36 @@ jobs:
         uses: snapcore/action-build@v1
         with:
           path: ./client
+          
+      - name: Import Debian repository GPG key
+        run: echo "${{ secrets.GPG_KEY }}" | gpg --import
+          
+      - name: Fetch Debian repository
+        uses: actions/checkout@v4
+        with:
+          repository: 'smart-linux-shell/deb'
+          path: 'deb-repo'
+          ssh-key: ${{ secrets.SSH_KEY }}
+        
+      - name: Replace with new version
+        run: |
+          rm deb-repo/*.deb;
+          cp client/ishell_${VERSION}_amd64.deb deb-repo/
+          
+      - name: Create Packages and Packages.gz
+        working-directory: deb-repo
+        run: |
+          dpkg-scanpackages --multiversion . > Packages;
+          gzip -k -f Packages
+          
+      - name: Create Release, Release.gpg and InRelease
+        working-directory: deb-repo
+        run: |
+          apt-ftparchive release . > Release;
+          gpg --default-key "ishell" -abs -o - Release > Release.gpg;
+          gpg --default-key "ishell" --clearsign -o - Release > InRelease
+          
+      - name: Push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          repository: ./deb-repo
