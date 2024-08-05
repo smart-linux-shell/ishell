@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps: 
       - name: Check out the repo
-        uses: SmartSeminarian/workflows@main
+        uses: smart-linux-shell/workflows@main
         with:
           docker-username: ${{ secrets.DOCKER_USERNAME }}
           docker-password: ${{ secrets.DOCKER_PASSWORD }}
