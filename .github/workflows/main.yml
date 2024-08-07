@@ -7,26 +7,30 @@ jobs:
   build_deb_snap:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out Git repository
+      - name: Check out repo
         uses: actions/checkout@v4
-        
+          
       - name: Make app
         working-directory: ./client 
         run: make
+        
       - name: Find version
         working-directory: ./client
         run: echo "VERSION=$(cat control | grep Version | cut -d' ' -f2)" >> $GITHUB_ENV
+        
       - name: Create deb directory structure
         working-directory: ./client
         run: |
           mkdir ishell_${VERSION}_amd64;
           mkdir -p ishell_${VERSION}_amd64/usr/bin;
           mkdir ishell_${VERSION}_amd64/DEBIAN
+          
       - name: Copy files
         working-directory: ./client
         run: |
           cp ishell ishell_${VERSION}_amd64/usr/bin/;
           cp control ishell_${VERSION}_amd64/DEBIAN/
+          
       - name: Build deb
         working-directory: ./client
         run: dpkg --build ishell_${VERSION}_amd64/
@@ -37,34 +41,62 @@ jobs:
           path: ./client
           
       - name: Import Debian repository GPG key
-        run: echo "${{ secrets.GPG_KEY }}" | gpg --import
+        run: echo "${{ secrets.DEB_GPG_KEY }}" | gpg --import
           
-      - name: Fetch Debian repository
-        uses: actions/checkout@v4
-        with:
-          repository: 'smart-linux-shell/deb'
-          path: 'deb-repo'
-          ssh-key: ${{ secrets.SSH_KEY }}
-        
-      - name: Replace with new version
+      - name: Create deb directory
+        working-directory: ./pkg
         run: |
-          rm deb-repo/*.deb;
-          cp client/ishell_${VERSION}_amd64.deb deb-repo/
+          mkdir deb;
+          cp KEY.gpg deb/;
+          cp sources.list deb/
+          
+      - name: Copy .deb package
+        run: |
+          cp client/ishell_${VERSION}_amd64.deb pkg/deb/
           
       - name: Create Packages and Packages.gz
-        working-directory: deb-repo
+        working-directory: ./pkg/deb
         run: |
           dpkg-scanpackages --multiversion . > Packages;
           gzip -k -f Packages
           
       - name: Create Release, Release.gpg and InRelease
-        working-directory: deb-repo
+        working-directory: ./pkg/deb
         run: |
           apt-ftparchive release . > Release;
           gpg --default-key "ishell" -abs -o - Release > Release.gpg;
-          gpg --default-key "ishell" --clearsign -o - Release > InRelease
-          
-      - name: Push changes
-        uses: stefanzweifel/git-auto-commit-action@v5
+          gpg --default-key "ishell" --clearsign -o - Release > InRelease 
+      
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          repository: ./deb-repo
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKER_USERNAME }}/${{github.event.repository.name}}
+          
+      - name: Set enviroment
+        shell: bash
+        run: |
+          echo "sha_short=$(git rev-parse "$GITHUB_SHA")" >> "$GITHUB_ENV"
+          echo "branch=$(echo ${GITHUB_REF#refs/heads/})" >> "$GITHUB_ENV"
+          
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./pkg
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/ishell.${{github.event.repository.name}}:${{ env.branch }}
+          labels: ${{ steps.meta.outputs.labels }}
+          
+      - name: Ping CI/CD to deploy
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.CICD_GITHUB_TOKEN }}
+          repository: smart-linux-shell/cicd
+          event-type: commit-to-branch
+          client-payload: '{"owner": "${{ github.repository_owner }}", "repo": "${{ github.event.repository.name }}", "branch": "${{ env.branch }}",  "sha": "${{ env.sha_short }}"}'
