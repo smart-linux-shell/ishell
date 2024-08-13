@@ -1,5 +1,8 @@
 import urwid
 import subprocess
+import threading
+import os
+import sys
 
 # urwid themes for frames
 palette = [
@@ -10,10 +13,8 @@ palette = [
     ('focused_prompt', 'yellow', 'dark gray'),
 ]
 
-
 class CustomFrame(urwid.WidgetWrap):
     def __init__(self, name, select_callback, loop):
-        # Initializes the frame with its name and a callback for selection events
         self.name = name
         self.is_focused = False
         self.commands_history = []
@@ -28,9 +29,11 @@ class CustomFrame(urwid.WidgetWrap):
         self.text = urwid.ListBox(urwid.SimpleFocusListWalker(self.text_content))
 
         self.body = urwid.AttrMap(urwid.LineBox(self.text), 'unfocused')
-        # self.body.keypress = select_callback
-
         super().__init__(self.body)
+
+        # Initialize subprocess attributes
+        self.process = None
+        self.stdout_thread = None
 
     def execute_command(self):
         # Executes the command entered by the user
@@ -67,20 +70,34 @@ class CustomFrame(urwid.WidgetWrap):
         if self.name.lower() == 'assistant':
             self._display_loading(command)
         else:
-            result = self._run_command(command)
-            self._display_result(command, result)
+            self._run_interactive_command(command)
 
-    def _run_command(self, command):
-        # Executes the given command and returns the result
-        try:
-            return subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT, text=True)
-        except subprocess.CalledProcessError as e:
-            return e.output
+    def _run_interactive_command(self, command):
+        # Start an interactive subprocess
+        if self.process and self.process.poll() is None:
+            self.process.stdin.write(command + "\n")
+            self.process.stdin.flush()
+        else:
+            self.process = subprocess.Popen(
+                command, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+            )
+            self.stdout_thread = threading.Thread(target=self._read_output)
+            self.stdout_thread.start()
+            self._display_interactive_output(command, "Started interactive session")
 
-    def _display_result(self, command, result):
-        # Displays the result of the executed command in the output widget
-        result_text = f"{self.name.lower()}> {command}\n{result}"
-        self.output.set_text(self.output.text + "\n" + result_text)
+    def _read_output(self):
+        # Reads output from the subprocess
+        for line in iter(self.process.stdout.readline, ''):
+            if line:
+                urwid.async_poll(self._update_output_text, line)
+
+    def _update_output_text(self, line):
+        # Updates the output text widget with new lines from the process
+        self.output.set_text(self.output.text + "\n" + line)
+
+    def _display_interactive_output(self, command, message):
+        # Displays initial message for interactive programs
+        self.output.set_text(self.output.text + f"\n{self.name.lower()}> {command}\n{message}")
 
     def _display_loading(self, command):
         # Displays loading before assistant replies
@@ -92,7 +109,6 @@ class CustomFrame(urwid.WidgetWrap):
 
     def _update_loading(self, loop=None, user_data=None):
         # Loop for loading
-        # FIXME This is mocked
         if self.loading_dots < 24:
             iter = self.loading_dots // 3
             dots = self.loading_dots % 3
@@ -108,7 +124,6 @@ class CustomFrame(urwid.WidgetWrap):
 
     def _display_generated_answer(self, loop=None, user_data=None):
         # Displays generated answer by assistant
-        # FIXME This is mocked
         self.output.set_text(self.output.text + """\n
 Lorem ipsum odor amet, consectetuer adipiscing elit. Lobortis parturient auctor ac urna sollicitudin consectetur. Nam nulla tempor habitant penatibus potenti mollis facilisis. Elit turpis vestibulum neque, efficitur aptent porttitor. Maecenas tempor volutpat purus maximus magna nisl volutpat aliquet erat. Nibh cubilia quisque non; torquent imperdiet magna aenean. Nisl proin a sit; sem ornare nascetur at dictum. Pellentesque lobortis ante sit viverra praesent eget scelerisque pellentesque tempor.
 
@@ -116,15 +131,13 @@ Molestie senectus ullamcorper felis proin integer. Finibus dictumst sem viverra 
 
 Viverra volutpat arcu adipiscing malesuada rhoncus faucibus. Libero nunc orci metus id quis vel. Conubia finibus consequat netus netus primis, feugiat vehicula potenti. Mi pulvinar interdum convallis ad id mauris. Feugiat risus tortor auctor felis interdum eget id fringilla mattis. Morbi aenean lectus integer dolor a diam magnis. Cubilia id ultrices augue vestibulum; facilisis convallis.""")
         self.loading = False
-        current_pallette = f"{self.name}_prompt"
+        current_palette = f"{self.name}_prompt"
         if self.is_focused:
-            current_pallette = "focused_prompt"
-        self.focus_text.set_caption((current_pallette, self.name.lower() + "> "))
-
+            current_palette = "focused_prompt"
+        self.focus_text.set_caption((current_palette, self.name.lower() + "> "))
 
 class MainFrame(urwid.Frame):
     def __init__(self, loop):
-        # Initializes "assistant" and "bash" frames at the beginning and then the whole layout around those two frames
         self.loop = loop
         self.frames = [CustomFrame("assistant", self.selectable_click, self.loop),
                        CustomFrame("bash", self.selectable_click, self.loop)]
@@ -133,7 +146,6 @@ class MainFrame(urwid.Frame):
         super().__init__(self.columns)
 
     def _init_layout(self):
-        # Initializes layout in columns, with max two rows in one column
         columns = []
         column_frames = []
         for i, frame in enumerate(self.frames):
@@ -150,11 +162,9 @@ class MainFrame(urwid.Frame):
         self.update_focus(self.frames[0])
 
     def _create_column(self, frames):
-        # Creates a column with a list of frames
         return urwid.Pile([urwid.AttrMap(f.body, None, focus_map='focused') for f in frames])
 
     def handle_input(self, key):
-        # Handles keyboard input for different shortcuts
         if key in ('shift tab', 'ctrl shift tab'):
             self.update_focus(self._change_focus_frame(1 if key == 'shift tab' else -1))
         elif key == 'enter':
@@ -167,25 +177,21 @@ class MainFrame(urwid.Frame):
             return False
 
     def add_frame(self, name):
-        # Adds a new frame to the layout and updates the layout
         self.frames.append(CustomFrame(name, self.selectable_click, self.loop))
         self._init_layout()
 
     def remove_frame(self):
-        # Removes the frame at the currently focused position
         if len(self.frames) > 1:
             idx = self.columns.focus_position * 2 + self.columns.contents[self.columns.focus_position][0].focus_position
             self.frames.pop(idx)
             self._init_layout()
 
     def execute_command(self):
-        # Executes the command at the currently focused frame
         col = self.columns.focus_position
         row = self.columns.contents[col][0].focus_position
         self.frames[col * 2 + row].execute_command()
 
     def _change_focus_frame(self, direction):
-        # Change the focus frame in the specified direction
         current_col = self.columns.focus_position
         current_row = self.columns.contents[current_col][0].base_widget.focus_position
         new_col, new_row = self._calculate_new_focus_position(current_col, current_row, direction)
@@ -196,7 +202,6 @@ class MainFrame(urwid.Frame):
         return self.frames[new_col * 2 + new_row]
 
     def _calculate_new_focus_position(self, col, row, direction):
-        # Calculates new focus position based on direction
         new_row = row + direction
         new_col = col
         if new_row >= len(self.columns.contents[col][0].base_widget.contents):
@@ -208,7 +213,6 @@ class MainFrame(urwid.Frame):
         return new_col, new_row
 
     def update_focus(self, focus_frame):
-        # Update the focus attributes for all frames and set the focused frame
         for frame in self.frames:
             frame.body.set_attr_map({None: 'unfocused'})
             frame.is_focused = False
@@ -220,7 +224,6 @@ class MainFrame(urwid.Frame):
             focus_frame.is_focused = True
 
     def selectable_click(self, frame, key):
-        # Callback function for mouse click on frame
         if key == 'mouse press':
             for i, frame in enumerate(self.frames):
                 if frame.body == frame:
@@ -233,14 +236,12 @@ class MainFrame(urwid.Frame):
         else:
             return False
 
-
 def main():
     loop = urwid.MainLoop(None, palette)
     frame = MainFrame(loop)
     loop.widget = frame
     loop.unhandled_input = frame.handle_input
     loop.run()
-
 
 if __name__ == "__main__":
     main()
