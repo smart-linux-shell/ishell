@@ -9,12 +9,15 @@
 
 #define CTRL(x)           ((x) & 0x1f)
 
-void switch_focus(WINDOW *&current_win, WINDOW *dialog_win, WINDOW *bash_win, bool &is_dialog_focused) {
-    is_dialog_focused = !is_dialog_focused;
-    current_win = is_dialog_focused ? dialog_win : bash_win;
-    wbkgd(dialog_win, is_dialog_focused ? COLOR_PAIR(1) : COLOR_PAIR(2));
-    wbkgd(bash_win, is_dialog_focused ? COLOR_PAIR(2) : COLOR_PAIR(1));
-    wrefresh(dialog_win);
+WINDOW* assistant_win;
+WINDOW* bash_win;
+
+void switch_focus(WINDOW *&current_win, WINDOW *assistant_win, WINDOW *bash_win, bool &is_assistant_focused) {
+    is_assistant_focused = !is_assistant_focused;
+    current_win = is_assistant_focused ? assistant_win : bash_win;
+    wbkgd(assistant_win, is_assistant_focused ? COLOR_PAIR(1) : COLOR_PAIR(2));
+    wbkgd(bash_win, is_assistant_focused ? COLOR_PAIR(2) : COLOR_PAIR(1));
+    wrefresh(assistant_win);
     wrefresh(bash_win);
 }
 
@@ -23,7 +26,7 @@ void execute_command(WINDOW* win, const std::string& command) {
     getyx(win, y, x);
 
     // Clear the current input line
-     wmove(win, y, 1); // Start from column 1 to avoid border
+    wmove(win, y, 1); // Start from column 1 to avoid border
     wclrtoeol(win);
     wrefresh(win);
 
@@ -71,7 +74,15 @@ void execute_command(WINDOW* win, const std::string& command) {
     }
     wmove(win, y, 1);
     wclrtoeol(win);
-    wprintw(win, "%s> ", (win == stdscr) ? "dialog" : "bash");
+
+    // Correctly determine which prompt to display
+    if (win == stdscr) {
+        wprintw(win, "assistant> ");
+    } else if (win == bash_win) {
+        wprintw(win, "bash> ");
+    } else {
+        wprintw(win, "assistant> ");
+    }
     wrefresh(win);
 }
 
@@ -88,70 +99,71 @@ int main() {
     getmaxyx(stdscr, rows, cols);
 
     // Create two windows
-    WINDOW* dialog_win = newwin(rows / 2 - 1, cols - 2, 0, 1);
-    WINDOW* bash_win = newwin(rows / 2 - 1, cols - 2, rows / 2, 1);
+    assistant_win = newwin(rows / 2 - 1, cols - 2, 0, 1);
+    bash_win = newwin(rows / 2 - 1, cols - 2, rows / 2, 1);
 
     // Draw boxes around the windows
-    box(dialog_win, 0, 0);
+    box(assistant_win, 0, 0);
     box(bash_win, 0, 0);
 
     // Add labels
-    mvwprintw(dialog_win, 1, 1, "dialog>");
+    mvwprintw(assistant_win, 1, 1, "assistant>");
     mvwprintw(bash_win, 1, 1, "bash>");
 
-    wbkgd(dialog_win, COLOR_PAIR(1)); // Initially focus on dialog
+    wbkgd(assistant_win, COLOR_PAIR(1)); // Initially focus on assistant
     wbkgd(bash_win, COLOR_PAIR(2));
-    wrefresh(dialog_win);
+    wrefresh(assistant_win);
     wrefresh(bash_win);
 
-    WINDOW *current_win = dialog_win;
-    bool is_dialog_focused = true;
+    WINDOW *current_win = assistant_win;
+    bool is_assistant_focused = true;
 
     char command[256];
     int command_len = 0;
 
     int ch;
     while ((ch = wgetch(current_win)) != 'q') {
-        switch (ch) {
-            case '\t':
-                switch_focus(current_win, dialog_win, bash_win, is_dialog_focused);
-                command_len = 0;
-                memset(command, 0, sizeof(command));
-                wmove(current_win, 1, 1);
-                wclrtoeol(current_win);
-                mvwprintw(current_win, 1, 1, "%s> ", (current_win == dialog_win) ? "dialog" : "bash");
-                wrefresh(current_win);
-                break;
-            case '\n':
-                if (command_len > 0) {
-                    command[command_len] = '\0';
-                    std::string command_str(command);
-                    execute_command(current_win, command_str);
-                    command_len = 0;
-                    memset(command, 0, sizeof(command));
-                }
-                break;
-            case KEY_BACKSPACE:
-            case 127:
-                if (command_len > 0) {
-                    command_len--;
-                    int x, y;
-                    getyx(current_win, y, x);
-                    mvwdelch(current_win, y, x - 1);
-                }
-                break;
-            default:
-                if (command_len < sizeof(command) - 1) {
-                    command[command_len++] = ch;
-                    waddch(current_win, ch);
-                }
-                break;
+        if (ch == '\t' && (ch & CTRL('I'))) { // Check for Ctrl + Tab
+            switch_focus(current_win, assistant_win, bash_win, is_assistant_focused);
+            command_len = 0;
+            memset(command, 0, sizeof(command));
+            wmove(current_win, 1, 1);
+            wclrtoeol(current_win);
+            mvwprintw(current_win, 1, 1, "%s> ", (current_win == assistant_win) ? "assistant" : "bash");
+            wrefresh(current_win);
+        } else {
+            switch (ch) {
+                case '\n':
+                    if (command_len > 0) {
+                        command[command_len] = '\0';
+                        std::string command_str(command);
+                        execute_command(current_win, command_str);
+                        command_len = 0;
+                        memset(command, 0, sizeof(command));
+                    }
+                    break;
+                case KEY_BACKSPACE:
+                case 127:
+                    if (command_len > 0) {
+                        command_len--;
+                        int x, y;
+                        getyx(current_win, y, x);
+                        mvwdelch(current_win, y, x - 1);
+                    }
+                    break;
+                default:
+                    if (command_len < sizeof(command) - 1) {
+                        command[command_len++] = ch;
+                        waddch(current_win, ch);
+                    }
+                    break;
+            }
+            wrefresh(current_win);
         }
-        wrefresh(current_win);
     }
 
     // Cleanup
-    delwin(dialog_win);
+    delwin(assistant_win);
     delwin(bash_win);
     endwin();
 
