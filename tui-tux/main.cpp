@@ -1,13 +1,11 @@
 #include <ncurses.h>
-#include <unistd.h>
-#include <sys/wait.h>
+#include <cstdio>     // For popen and pclose
 #include <cstdlib>
 #include <string>
 #include <cstring>
-#include <vector>
 #include <iostream>
 
-#define CTRL(x)           ((x) & 0x1f)
+#define CTRL(x) ((x) & 0x1f)
 
 WINDOW* assistant_win;
 WINDOW* bash_win;
@@ -30,58 +28,38 @@ void execute_command(WINDOW* win, const std::string& command) {
     wclrtoeol(win);
     wrefresh(win);
 
-    // Fork a process to execute the command
-    pid_t pid = fork();
-    if (pid == 0) { // Child process
-        // Redirect output to the window
-        int pipe_fd[2];
-        pipe(pipe_fd);
-        if (fork() == 0) {
-            dup2(pipe_fd[1], STDOUT_FILENO);
-            dup2(pipe_fd[1], STDERR_FILENO);
-            close(pipe_fd[0]);
-            close(pipe_fd[1]);
-
-            execlp("bash", "bash", "-c", command.c_str(), nullptr);
-            _exit(1); // If exec fails
-        } else {
-            close(pipe_fd[1]);
-            char buffer[128];
-            int n;
-            while ((n = read(pipe_fd[0], buffer, sizeof(buffer) - 1)) > 0) {
-                buffer[n] = '\0';
-                wmove(win, y, 1); // Move to the start of the current line (inside the border)
-                waddstr(win, buffer);
-                wrefresh(win);
-                getyx(win, y, x);
-            }
-            close(pipe_fd[0]);
-            wait(nullptr); // Wait for the child process to finish
-            exit(0);
-        }
-    } else { // Parent process
-        wait(nullptr); // Wait for the child process to finish
+    // Open a pipe to execute the command
+    FILE* fp = popen(command.c_str(), "r");
+    if (fp == nullptr) {
+        wprintw(win, "Failed to run command\n");
+        wrefresh(win);
+        return;
     }
+
+    char buffer[128];
+    while (fgets(buffer, sizeof(buffer), fp) != nullptr) {
+        wprintw(win, "%s", buffer);
+        getyx(win, y, x);
+        if (y >= getmaxy(win) - 2) {
+            wscrl(win, 1);
+            y = getmaxy(win) - 2;
+        }
+        wmove(win, y, 1);
+        wrefresh(win);
+    }
+    pclose(fp);
 
     // Move cursor to the next line and print the prompt again
     getyx(win, y, x); // Get current cursor position after command output
-    if (y >= getmaxy(win) - 2) {
-        // Scroll the window if we're at the bottom line
-        wscrl(win, 1);
-        y = getmaxy(win) - 2;
-    } else {
-        y++;
-    }
+    y++;
     wmove(win, y, 1);
     wclrtoeol(win);
 
     // Correctly determine which prompt to display
-    if (win == stdscr) {
+    if (win == assistant_win) {
         wprintw(win, "assistant> ");
     } else if (win == bash_win) {
         wprintw(win, "bash> ");
-    } else {
-        wprintw(win, "assistant> ");
     }
     wrefresh(win);
 }
