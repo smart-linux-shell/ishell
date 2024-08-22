@@ -35,19 +35,15 @@ private:
 
     void init() {
 
-
         int rows, cols;
         getmaxyx(stdscr, rows, cols);
 
         refresh();
 
         // Wait for 30 seconds before proceeding
-        mvprintw(rows / 2, cols / 2 - 10, "Waiting for 30 seconds...");
         // sleep(30);
-
-        // Clear the message
-        clear();
-        refresh();
+        // clear();
+        // refresh();
 
         initscr();
         start_color();
@@ -89,23 +85,42 @@ private:
         endwin();
     }
 
-    // ... (rest of your code remains unchanged)
-
     void switch_focus() {
+        // Toggle the focus state
         is_assistant_focused = !is_assistant_focused;
         current_win = is_assistant_focused ? assistant_win : bash_win;
+
+        // Change the background color for the entire window
         wbkgd(assistant_win, is_assistant_focused ? COLOR_PAIR(1) : COLOR_PAIR(2));
         wbkgd(bash_win, is_assistant_focused ? COLOR_PAIR(2) : COLOR_PAIR(1));
+
+        // Force a redraw of the entire window to preserve previous content
+        touchwin(assistant_win);
+        touchwin(bash_win);
         wrefresh(assistant_win);
         wrefresh(bash_win);
 
         // Clear and reset the prompt in the new focused window
-        command_len = 0;
-        memset(command, 0, sizeof(command));
-        wmove(current_win, 2, 1);
-        wclrtoeol(current_win);
-        mvwprintw(current_win, 2, 1, "%s> ", is_assistant_focused ? "assistant" : "bash");
+        // command_len = 0;
+        // memset(command, 0, sizeof(command));
+
+        // Find the current cursor position
+        int y, x;
+        getyx(current_win, y, x);
+        if (x >= getmaxx(current_win) - 1) {
+            x = 0;
+            y++;
+        }
+
+        // If we're at the bottom, scroll the window
+        if (y >= getmaxy(current_win) - 1) {
+            wscrl(current_win, 1);
+            y = getmaxy(current_win) - 2;
+        }
+
+        wmove(current_win, y, x); // Move cursor to the correct position
         wrefresh(current_win);
+
     }
 
     void execute_command(const std::string& command) {
