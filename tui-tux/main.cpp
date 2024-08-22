@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <string>
 #include <cstring>
+#include <unistd.h> // Include this header for sleep()
 
 #define CTRL(x) ((x) & 0x1f)
 
@@ -29,9 +30,25 @@ private:
     WINDOW* current_win;
     bool is_assistant_focused;
     char command[256];
+
     int command_len;
 
     void init() {
+
+
+        int rows, cols;
+        getmaxyx(stdscr, rows, cols);
+
+        refresh();
+
+        // Wait for 30 seconds before proceeding
+        mvprintw(rows / 2, cols / 2 - 10, "Waiting for 30 seconds...");
+        // sleep(30);
+
+        // Clear the message
+        clear();
+        refresh();
+
         initscr();
         start_color();
         init_pair(1, COLOR_BLACK, COLOR_WHITE); // Focused window
@@ -40,8 +57,8 @@ private:
         cbreak();
         keypad(stdscr, TRUE);
 
-        int rows, cols;
         getmaxyx(stdscr, rows, cols);
+
 
         // Create the windows with proper spacing
         assistant_win = newwin(rows / 2 - 1, cols - 4, 1, 2);
@@ -59,8 +76,8 @@ private:
         current_win = assistant_win;
         wbkgd(assistant_win, COLOR_PAIR(1));
         wbkgd(bash_win, COLOR_PAIR(2));
-        wrefresh(assistant_win);
         wrefresh(bash_win);
+        wrefresh(assistant_win);
 
         command_len = 0;
         memset(command, 0, sizeof(command));
@@ -71,6 +88,8 @@ private:
         delwin(bash_win);
         endwin();
     }
+
+    // ... (rest of your code remains unchanged)
 
     void switch_focus() {
         is_assistant_focused = !is_assistant_focused;
