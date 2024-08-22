@@ -185,10 +185,23 @@ private:
                     break;
                 default:
                     if (command_len < sizeof(command) - 1) {
-                        command[command_len++] = ch;
-                        waddch(current_win, ch);
+                        int y, x;
+                        getyx(current_win, y, x);
+                        if (x < getmaxx(current_win) - 2 && y > 0 && y < getmaxy(current_win) - 1) {
+                            command[command_len++] = ch;
+                            waddch(current_win, ch);
+                        } else if (x >= getmaxx(current_win) - 2) {
+                            x = 1;
+                            y++;
+                            if (y < getmaxy(current_win) - 1) {  
+                                wmove(current_win, y, x);
+                                command[command_len++] = ch;
+                                waddch(current_win, ch);
+                            }
+                        }
                     }
-                    break;
+                break;
+
             }
             wrefresh(current_win);
         }
