@@ -6,6 +6,7 @@
 #include <string>
 #include <cstring>
 #include <unistd.h>
+#include <vector>
 
 #define CTRL_KEY(x) ((x) & 0x1f)
 
@@ -13,6 +14,8 @@ class TerminalMultiplexer {
 public:
     TerminalMultiplexer() : assistant_win(nullptr), bash_win(nullptr), current_win(nullptr), is_assistant_focused(true) {
         init_windows();
+        current_commands.resize(2); // 0 for assistant, 1 for bash
+        command_history.resize(2);  // 0 for assistant, 1 for bash
     }
 
     ~TerminalMultiplexer() {
@@ -31,8 +34,9 @@ private:
     WINDOW* bash_win;
     WINDOW* current_win;
     bool is_assistant_focused;
-    char command_buffer[256];
-    int command_len;
+
+    std::vector<std::string> current_commands;  // To store the current command in each terminal
+    std::vector<std::vector<std::string>> command_history;  // To store the history of commands for each terminal
 
     void init_windows() {
         initscr();
@@ -50,9 +54,6 @@ private:
         bash_win = create_window(rows / 2 - 1, cols - 4, rows / 2 + 1, 2, "bash>");
 
         set_focus_on_window(assistant_win);
-
-        command_len = 0;
-        memset(command_buffer, 0, sizeof(command_buffer));
     }
 
     WINDOW* create_window(int height, int width, int starty, int startx, const char* label) {
@@ -129,7 +130,9 @@ private:
 
     void scroll_if_needed(int& y) {
         if (y >= getmaxy(current_win) - 1) {
-            for (int i = 2; i   < getmaxy(current_win) - 1; i++) {
+            char command_buffer[1024];  // Local buffer to hold the current line
+
+            for (int i = 2; i < getmaxy(current_win) - 1; i++) {
                 mvwinnstr(current_win, i + 1, 1, command_buffer, getmaxx(current_win) - 2);
                 mvwprintw(current_win, i, 1, "%s", command_buffer);
             }
@@ -210,17 +213,18 @@ private:
     }
 
     void execute_command_if_not_empty() {
-        if (command_len > 0) {
-            command_buffer[command_len] = '\0';
-            execute_command(command_buffer);
-            command_len = 0;
-            memset(command_buffer, 0, sizeof(command_buffer));
+        int index = is_assistant_focused ? 0 : 1;
+        if (!current_commands[index].empty()) {
+            execute_command(current_commands[index]);
+            command_history[index].push_back(current_commands[index]);
+            current_commands[index].clear();
         }
     }
 
     void handle_backspace() {
-        if (command_len > 0) {
-            command_len--;
+        int index = is_assistant_focused ? 0 : 1;
+        if (!current_commands[index].empty()) {
+            current_commands[index].pop_back();
             int y, x;
             getyx(current_win, y, x);
             mvwaddch(current_win, y, x - 1, ' '); // Replace character with space
@@ -238,17 +242,19 @@ private:
         wrefresh(bash_win);
     }
 
-
     void handle_character_input(int ch) {
-        if (command_len < sizeof(command_buffer) - 1) {
+        int index = is_assistant_focused ? 0 : 1;
+        char command_buffer[1024];  // Local buffer to hold the command
+
+        if (current_commands[index].size() < sizeof(command_buffer) - 1) {
             int y, x;
             getyx(current_win, y, x);
             if (x < getmaxx(current_win) - 2) {
-                command_buffer[command_len++] = ch;
+                current_commands[index].push_back(ch);
                 waddch(current_win, ch);
             } else if (y < getmaxy(current_win) - 1) {
                 move_cursor_to_new_line(y, x);
-                command_buffer[command_len++] = ch;
+                current_commands[index].push_back(ch);
                 waddch(current_win, ch);
             }
             wrefresh(current_win);
@@ -256,14 +262,15 @@ private:
     }
 
     void move_cursor_to_new_line(int& y, int& x) {
-        x = 1;
         y++;
+        scroll_if_needed(y);
+        x = 1;
         wmove(current_win, y, x);
     }
 };
 
 int main() {
-    TerminalMultiplexer tmux;
-    tmux.run();
+    TerminalMultiplexer multiplexer;
+    multiplexer.run();
     return 0;
 }
