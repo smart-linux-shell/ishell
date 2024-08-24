@@ -57,6 +57,7 @@ private:
 
     WINDOW* create_window(int height, int width, int starty, int startx, const char* label) {
         WINDOW* win = newwin(height, width, starty, startx);
+        scrollok(win, TRUE);  // Enable scrolling for the window
         box(win, 0, 0);
         mvwprintw(win, 1, 1, "%s", label);
         wrefresh(win);
@@ -91,13 +92,10 @@ private:
         int y, x;
         getyx(current_win, y, x);
         if (x >= getmaxx(current_win) - 1) {
-            x = 0;
+            x = 1;
             y++;
         }
-        if (y >= getmaxy(current_win) - 1) {
-            wscrl(current_win, 1);
-            y = getmaxy(current_win) - 2;
-        }
+        scroll_if_needed(y);
         wmove(current_win, y, x);
         wrefresh(current_win);
     }
@@ -131,7 +129,11 @@ private:
 
     void scroll_if_needed(int& y) {
         if (y >= getmaxy(current_win) - 1) {
-            wscrl(current_win, 1);
+            for (int i = 2; i   < getmaxy(current_win) - 1; i++) {
+                mvwinnstr(current_win, i + 1, 1, command_buffer, getmaxx(current_win) - 2);
+                mvwprintw(current_win, i, 1, "%s", command_buffer);
+            }
+            mvwhline(current_win, getmaxy(current_win) - 2, 1, ' ', getmaxx(current_win) - 2);
             y = getmaxy(current_win) - 2;
         }
     }
@@ -221,10 +223,21 @@ private:
             command_len--;
             int y, x;
             getyx(current_win, y, x);
-            mvwdelch(current_win, y, x - 1);
+            mvwaddch(current_win, y, x - 1, ' '); // Replace character with space
+            wmove(current_win, y, x - 1); // Move cursor back
+            draw_borders(); // Redraw the borders
             wrefresh(current_win);
         }
     }
+
+    void draw_borders() {
+        // Redraw the box around the window
+        box(assistant_win, 0, 0);
+        box(bash_win, 0, 0);
+        wrefresh(assistant_win);
+        wrefresh(bash_win);
+    }
+
 
     void handle_character_input(int ch) {
         if (command_len < sizeof(command_buffer) - 1) {
