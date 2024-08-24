@@ -1,9 +1,11 @@
 #include <ncurses.h>
 #include <cstdio>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <cstdlib>
 #include <string>
 #include <cstring>
-#include <unistd.h> // Include this header for sleep()
+#include <unistd.h> 
 
 #define CTRL(x) ((x) & 0x1f)
 
@@ -124,44 +126,98 @@ private:
     }
 
     void execute_command(const std::string& command) {
-        int x, y;
+
+        // Move to the next row and print the prompt
+        int y, x;
         getyx(current_win, y, x);
-
+        y++;
+        if (y >= getmaxy(current_win) - 1) {
+            wscrl(current_win, 1);
+            y = getmaxy(current_win) - 2;
+        }
         wmove(current_win, y, 1);
-        wclrtoeol(current_win);
-        wrefresh(current_win);
 
-        FILE* fp = popen(command.c_str(), "r");
-        if (fp == nullptr) {
-            wprintw(current_win, "Failed to run command\n");
-            wrefresh(current_win);
+        int pipefd[2];
+        if (pipe(pipefd) == -1) {
+            wprintw(current_win, "Pipe failed\n");
             return;
         }
 
-        char buffer[128];
-        while (fgets(buffer, sizeof(buffer), fp) != nullptr) {
-            wprintw(current_win, "%s", buffer);
+        pid_t pid = fork();
+        if (pid == -1) {
+            wprintw(current_win, "Fork failed\n");
+            return;
+        }
+
+        if (pid == 0) {
+            // Child process
+            close(pipefd[0]); // Close unused read end
+            dup2(pipefd[1], STDOUT_FILENO); // Redirect stdout to pipe
+            dup2(pipefd[1], STDERR_FILENO); // Redirect stderr to pipe
+            close(pipefd[1]);
+
+            // Execute command
+            execl("/bin/sh", "sh", "-c", command.c_str(), nullptr);
+            _exit(EXIT_FAILURE);
+        } else {
+            // Parent process
+            close(pipefd[1]); // Close unused write end
+            char buffer[128];
+            ssize_t count;
+
+            while ((count = read(pipefd[0], buffer, sizeof(buffer) - 1)) > 0) {
+                buffer[count] = '\0';
+
+                int y, x;
+                getyx(current_win, y, x);
+                int width = getmaxx(current_win);
+
+                for (int i = 0; i < count; ++i) {
+                    if (x == width - 1) {
+                        wmove(current_win, ++y, 1);
+                        if (y >= getmaxy(current_win) - 1) {
+                            wscrl(current_win, 1);
+                            y = getmaxy(current_win) - 2;
+                        }
+                        x = 1;
+                    }
+
+                    if (buffer[i] == '\n') {
+                        y++;
+                        x = 1;
+                        if (y >= getmaxy(current_win) - 1) {
+                            wscrl(current_win, 1);
+                            y = getmaxy(current_win) - 2;
+                        }
+                        wmove(current_win, y, x);
+                    } else {
+                        waddch(current_win, buffer[i]);
+                        x++;
+                    }
+                }
+                wrefresh(current_win);
+            }
+            close(pipefd[0]);
+
+            waitpid(pid, nullptr, 0);
+
             getyx(current_win, y, x);
-            if (y >= getmaxy(current_win) - 2) {
+            if (y >= getmaxy(current_win) - 1) {
                 wscrl(current_win, 1);
                 y = getmaxy(current_win) - 2;
             }
             wmove(current_win, y, 1);
+            wprintw(current_win, "%s> ", is_assistant_focused ? "assistant" : "bash");
             wrefresh(current_win);
         }
-        pclose(fp);
-
-        getyx(current_win, y, x);
-        y++;
-        wmove(current_win, y, 1);
-        wclrtoeol(current_win);
-
-        wprintw(current_win, "%s> ", is_assistant_focused ? "assistant" : "bash");
-        wrefresh(current_win);
     }
 
+
+
+
+
     void handle_input(int ch) {
-        if (ch == '\t' && (ch & CTRL('I'))) { // Ctrl + Tab
+        if (ch == '\t' && (ch & CTRL('I'))) {
             switch_focus();
         } else {
             switch (ch) {
@@ -193,7 +249,7 @@ private:
                         } else if (x >= getmaxx(current_win) - 2) {
                             x = 1;
                             y++;
-                            if (y < getmaxy(current_win) - 1) {  
+                            if (y < getmaxy(current_win) - 1) {
                                 wmove(current_win, y, x);
                                 command[command_len++] = ch;
                                 waddch(current_win, ch);
