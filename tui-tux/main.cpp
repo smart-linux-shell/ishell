@@ -40,6 +40,7 @@ private:
 
     std::vector<std::string> current_commands;  // Store the current command in each terminal
     std::vector<std::vector<std::string>> command_history;  // Store the history of commands for each terminal
+    std::vector<std::vector<std::string>> history; // Store whole history of commands for each terminal
 
     void init_screen() {
         initscr();
@@ -50,7 +51,8 @@ private:
         cbreak();
         keypad(stdscr, TRUE);
         current_commands.resize(2); // 0 for assistant, 1 for bash
-        command_history.resize(2);  // 0 for assistant, 1 for bash
+        command_history.resize(2);
+        history.resize(2);// 0 for assistant, 1 for bash
     }
 
     void init_windows() {
@@ -149,7 +151,7 @@ private:
         if (y >= getmaxy(current_win) - 1) {
             char command_buffer[1024];  // Local buffer to hold the current line
 
-            for (int i = 2; i < getmaxy(current_win) - 1; i++) {
+            for (int i = 1; i < getmaxy(current_win) - 1; i++) {
                 mvwinnstr(current_win, i + 1, 1, command_buffer, getmaxx(current_win) - 2);
                 mvwprintw(current_win, i, 1, "%s", command_buffer);
             }
@@ -176,8 +178,10 @@ private:
         close(pipefd[1]);
         char buffer[128];
         ssize_t count;
+        int index = is_assistant_focused ? 0 : 1;
         while ((count = read(pipefd[0], buffer, sizeof(buffer) - 1)) > 0) {
             buffer[count] = '\0';
+            history[index].push_back(buffer);
             print_buffer(buffer, count);
         }
         close(pipefd[0]);
@@ -231,9 +235,11 @@ private:
 
     void execute_command_if_not_empty() {
         int index = is_assistant_focused ? 0 : 1;
+        std::string prompt = is_assistant_focused ? "assistant>" : "bash>";
         if (!current_commands[index].empty()) {
             execute_command(current_commands[index]);
             command_history[index].push_back(current_commands[index]);
+            history[index].push_back(prompt + current_commands[index]);
             current_commands[index].clear();
         }
     }
