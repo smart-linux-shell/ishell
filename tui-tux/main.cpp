@@ -21,11 +21,13 @@ public:
         cleanup();
     }
 
+
     void run() {
         int ch;
         while ((ch = wgetch(current_win)) != 'q') {
             if (ch == KEY_RESIZE) {
                 init_windows();
+                write_history();
             } else {
                 handle_input(ch);
             }
@@ -69,11 +71,16 @@ private:
         clear();
         refresh();
 
-        assistant_win = create_window(rows / 2 - 1, cols - 4, 1, 2, "assistant>");
-        bash_win = create_window(rows / 2 - 1, cols - 4, rows / 2 + 1, 2, "bash>");
+        assistant_win = create_window(rows / 2 - 1, cols - 4, 1, 2, "assistant> ");
+        bash_win = create_window(rows / 2 - 1, cols - 4, rows / 2 + 1, 2, "bash> ");
         current_win = is_assistant_focused ? assistant_win : bash_win;
         set_focus_on_window(current_win);
     }
+
+    void write_history() {
+
+    }
+
 
     WINDOW* create_window(int height, int width, int starty, int startx, const char* label) {
         WINDOW* win = newwin(height, width, starty, startx);
@@ -121,6 +128,11 @@ private:
     }
 
     void execute_command(const std::string& command) {
+        if (command == "clear") {
+            clear_current_window();
+            return;
+        }
+
         int y, x;
         getyx(current_win, y, x);
         y++;
@@ -158,6 +170,14 @@ private:
             mvwhline(current_win, getmaxy(current_win) - 2, 1, ' ', getmaxx(current_win) - 2);
             y = getmaxy(current_win) - 2;
         }
+    }
+
+    void clear_current_window() {
+        werase(current_win);  // Clear the window's contents
+        box(current_win, 0, 0); // Reprint the border
+        wmove(current_win, 1, 1);
+        print_prompt(); // Reprint the prompt
+        wrefresh(current_win);
     }
 
     void print_error(const char* msg) {
