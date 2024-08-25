@@ -43,6 +43,8 @@ private:
     std::vector<std::string> current_commands;  // Store the current command in each terminal
     std::vector<std::vector<std::string>> command_history;  // Store the history of commands for each terminal
     std::vector<std::vector<std::string>> history; // Store whole history of commands for each terminal
+    std::vector<int> pointer_to_command_in_history;
+
 
     void init_screen() {
         initscr();
@@ -55,6 +57,8 @@ private:
         current_commands.resize(2); // 0 for assistant, 1 for bash
         command_history.resize(2);
         history.resize(2);// 0 for assistant, 1 for bash
+        pointer_to_command_in_history.resize(2, -1);  // Initialize with -1 (indicating no history navigation yet)
+
     }
 
     void init_windows() {
@@ -73,9 +77,15 @@ private:
 
         assistant_win = create_window(rows / 2 - 1, cols - 4, 1, 2, "assistant> ");
         bash_win = create_window(rows / 2 - 1, cols - 4, rows / 2 + 1, 2, "bash> ");
+
+        // Enable keypad mode for the windows
+        keypad(assistant_win, TRUE);
+        keypad(bash_win, TRUE);
+
         current_win = is_assistant_focused ? assistant_win : bash_win;
         set_focus_on_window(current_win);
     }
+
 
 
     void write_history() {
@@ -287,16 +297,49 @@ private:
     }
 
     void handle_input(int ch) {
+        int index = is_assistant_focused ? 0 : 1;
+
         if (ch == CTRL_KEY('i')) {
             set_focus_on_window(is_assistant_focused ? bash_win : assistant_win);
+            pointer_to_command_in_history[index] = -1;  // Reset pointer on focus switch
         } else if (ch == '\n') {
             execute_command_if_not_empty();
+            pointer_to_command_in_history[index] = -1;  // Reset pointer after executing a command
         } else if (ch == KEY_BACKSPACE || ch == 127) {
             handle_backspace();
+        } else if (ch == KEY_UP) {
+            if (!command_history[index].empty()) {
+                if (pointer_to_command_in_history[index] == -1) {
+                    pointer_to_command_in_history[index] = command_history[index].size() - 1;
+                } else if (pointer_to_command_in_history[index] > 0) {
+                    pointer_to_command_in_history[index]--;
+                }
+                update_current_command_from_history(index);
+            }
+        } else if (ch == KEY_DOWN) {
+            if (pointer_to_command_in_history[index] != -1) {
+                pointer_to_command_in_history[index]++;
+                if (pointer_to_command_in_history[index] >= command_history[index].size()) {
+                    pointer_to_command_in_history[index] = -1;  // Reset to the empty command
+                } else {
+                    update_current_command_from_history(index);
+                }
+            }
+            wrefresh(current_win);
         } else {
             handle_character_input(ch);
         }
     }
+
+    void update_current_command_from_history(int index) {
+        current_commands[index] = command_history[index][pointer_to_command_in_history[index]];
+        int y, x;
+        getyx(current_win, y, x);
+        mvwprintw(current_win, y, 1, "%s> %s", is_assistant_focused ? "assistant" : "bash", current_commands[index].c_str());
+        wclrtoeol(current_win);  // Clear to the end of the line
+        wrefresh(current_win);
+    }
+
 
     void execute_command_if_not_empty() {
         int index = is_assistant_focused ? 0 : 1;
