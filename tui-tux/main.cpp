@@ -77,9 +77,53 @@ private:
         set_focus_on_window(current_win);
     }
 
-    void write_history() {
 
+    void write_history() {
+        werase(current_win);  // Clear the window's contents
+        box(current_win, 0, 0); // Reprint the border
+        wmove(current_win, 1, 1);
+        wrefresh(current_win);
+
+        int y = 1, x = 1;
+        int width = getmaxx(current_win) - 2;  // Width of the content area
+        int height = getmaxy(current_win) - 2; // Height of the content area
+
+        int index = is_assistant_focused ? 0 : 1;
+        int num_lines_to_show = height; // Calculate how many lines can be shown
+        int start_line = std::max(0, (int)history[index].size() - num_lines_to_show); // Start from the most recent history that fits in the window
+
+        for (int i = start_line; i < history[index].size(); i++) {
+            std::string buffer = history[index][i];
+            for (int j = 0; j < buffer.size(); j++) {
+                if (buffer[j] == '\n' || x >= width) {
+                    y++;
+                    x = 1;
+                    scroll_if_needed(y); // Ensure the content stays within the window's scrollable area
+                }
+                if (y > height) {
+                    break; // Stop if the window is full
+                }
+                if (buffer[j] == '\t') {
+                    int tab_spaces = 4 - (x - 1) % 4; // Calculate tab stop (assuming 4-space tabs)
+                    for (int t = 0; t < tab_spaces; t++) {
+                        waddch(current_win, ' ');
+                        x++;
+                        if (x == width - 1) { // Handle line wrapping
+                            wmove(current_win, ++y, 1);
+                            scroll_if_needed(y);
+                            x = 1;
+                        }
+                    }
+                }
+                else if (buffer[j] != '\n') {
+                    mvwaddch(current_win, y, x++, buffer[j]);
+                }
+            }
+        }
+        wrefresh(current_win);
+        print_prompt();
     }
+
 
 
     WINDOW* create_window(int height, int width, int starty, int startx, const char* label) {
@@ -235,6 +279,7 @@ private:
     void print_prompt() {
         int y, x;
         getyx(current_win, y, x);
+        y++;
         scroll_if_needed(y);
         wmove(current_win, y, 1);
         wprintw(current_win, "%s> ", is_assistant_focused ? "assistant" : "bash");
@@ -257,9 +302,9 @@ private:
         int index = is_assistant_focused ? 0 : 1;
         std::string prompt = is_assistant_focused ? "assistant>" : "bash>";
         if (!current_commands[index].empty()) {
-            execute_command(current_commands[index]);
             command_history[index].push_back(current_commands[index]);
-            history[index].push_back(prompt + current_commands[index]);
+            history[index].push_back(prompt + current_commands[index] + "\n");
+            execute_command(current_commands[index]);
             current_commands[index].clear();
         }
     }
