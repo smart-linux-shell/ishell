@@ -13,9 +13,8 @@
 class TerminalMultiplexer {
 public:
     TerminalMultiplexer() : assistant_win(nullptr), bash_win(nullptr), current_win(nullptr), is_assistant_focused(true) {
+        init_screen();
         init_windows();
-        current_commands.resize(2); // 0 for assistant, 1 for bash
-        command_history.resize(2);  // 0 for assistant, 1 for bash
     }
 
     ~TerminalMultiplexer() {
@@ -25,7 +24,11 @@ public:
     void run() {
         int ch;
         while ((ch = wgetch(current_win)) != 'q') {
-            handle_input(ch);
+            if (ch == KEY_RESIZE) {
+                init_windows();
+            } else {
+                handle_input(ch);
+            }
         }
     }
 
@@ -35,10 +38,10 @@ private:
     WINDOW* current_win;
     bool is_assistant_focused;
 
-    std::vector<std::string> current_commands;  // To store the current command in each terminal
-    std::vector<std::vector<std::string>> command_history;  // To store the history of commands for each terminal
+    std::vector<std::string> current_commands;  // Store the current command in each terminal
+    std::vector<std::vector<std::string>> command_history;  // Store the history of commands for each terminal
 
-    void init_windows() {
+    void init_screen() {
         initscr();
         start_color();
         init_pair(1, COLOR_BLACK, COLOR_WHITE);  // Focused window
@@ -46,14 +49,28 @@ private:
         noecho();
         cbreak();
         keypad(stdscr, TRUE);
+        current_commands.resize(2); // 0 for assistant, 1 for bash
+        command_history.resize(2);  // 0 for assistant, 1 for bash
+    }
 
+    void init_windows() {
         int rows, cols;
         getmaxyx(stdscr, rows, cols);
 
+        if (assistant_win != nullptr) {
+            delwin(assistant_win);
+        }
+        if (bash_win != nullptr) {
+            delwin(bash_win);
+        }
+
+        clear();
+        refresh();
+
         assistant_win = create_window(rows / 2 - 1, cols - 4, 1, 2, "assistant>");
         bash_win = create_window(rows / 2 - 1, cols - 4, rows / 2 + 1, 2, "bash>");
-
-        set_focus_on_window(assistant_win);
+        current_win = is_assistant_focused ? assistant_win : bash_win;
+        set_focus_on_window(current_win);
     }
 
     WINDOW* create_window(int height, int width, int starty, int startx, const char* label) {
@@ -66,8 +83,8 @@ private:
     }
 
     void cleanup() {
-        delwin(assistant_win);
-        delwin(bash_win);
+        if (assistant_win) delwin(assistant_win);
+        if (bash_win) delwin(bash_win);
         endwin();
     }
 
