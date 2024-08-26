@@ -9,14 +9,8 @@
 #include <signal.h>
 #include <regex>
 
-#define CTRL(x) ((x) & 0x1f)
-
 #define ANSI_NULL 0
 #define ANSI_IN_ESCAPE 1
-#define ANSI_IN_ESCAPE_CSI 2
-#define ANSI_IN_ESCAPE_OTHER 3
-
-extern char **environ;
 
 class Screen {
 public:
@@ -37,7 +31,6 @@ public:
     void write_char(char ch) {
         int curx = getcurx(window);
         int cury = getcury(window);
-        lines[cury].data[curx] = ch;
     
         if (curx == getmaxx(window) - 1) {
             if (!cursor_wrapped) {
@@ -52,11 +45,16 @@ public:
                 cursor_return();
                 waddch(window, ch);
                 cursor_wrapped = false;
+
+                curx = getcurx(window);
+                cury = getcury(window);
             }
         } else {
             // Just write
             waddch(window, ch);
         }
+
+        lines[cury].data[curx] = ch;
 
         wrefresh(window);
     }
@@ -117,7 +115,6 @@ public:
     }
 
     void erase_in_place() {
-        // TODO: hope to remove this
         int curx = getcurx(window);
         int cury = getcury(window);
         lines[cury].data[curx] = ' ';
@@ -154,15 +151,13 @@ public:
 
     void scroll_down() {
         wclear(window);
-        move_cursor(0, 0);
 
         for (int i = 1; i < n_lines; i++) {
             lines[i - 1] = lines[i];
             for (int j = 0; j < n_cols; j++) {
                 if (lines[i].data[j] != 0) {
-                    waddch(window, lines[i].data[j]);
+                    mvwaddch(window, i - 1, j, lines[i].data[j]);
                 } else {
-                    move_cursor(i, 0);
                     break;
                 }
             }
@@ -172,14 +167,14 @@ public:
         lines[n_lines - 1].wrapped = false;
         memset(lines[n_lines - 1].data, 0, n_cols);
 
-        wrefresh(window);
+        move_cursor(n_lines - 1, 0);
     }
 
     void scroll_up() {
         wclear(window);
         
         // Move the line data first
-        for (int i = n_lines - 1; i > 1; i--) {
+        for (int i = n_lines - 1; i > 0; i--) {
             lines[i] = lines[i - 1];
         }
 
@@ -189,14 +184,12 @@ public:
 
         // Redraw
         wclear(window);
-        move_cursor(1, 0);
 
         for (int i = 1; i < n_lines; i++) {
             for (int j = 0; j < n_cols; j++) {
                 if (lines[i].data[j] != 0) {
-                    waddch(window, lines[i].data[j]);
+                    mvwaddch(window, i, j, lines[i].data[j]);
                 } else {
-                    move_cursor(i + 1, 0);
                     break;
                 }
             }
@@ -257,6 +250,8 @@ void escape(std::string &seq, Screen &bash_screen) {
     std::regex up_rel_regex("^\\[(\\d+)A$");
     std::regex down_rel_regex("^\\[(\\d+)B$");
 
+    std::regex scroll_up_regex("^M$");
+
     std::smatch matches;
 
     if (std::regex_match(seq, clear_regex)) {
@@ -287,6 +282,8 @@ void escape(std::string &seq, Screen &bash_screen) {
         bash_screen.move_cursor(bash_screen.get_y() - std::stoi(matches[1].str()), bash_screen.get_x());
     } else if (std::regex_match(seq, matches, down_rel_regex)) {
         bash_screen.move_cursor(bash_screen.get_y() + std::stoi(matches[1].str()), bash_screen.get_x());
+    } else if (std::regex_match(seq, scroll_up_regex)) {
+        bash_screen.scroll_up();
     }
 }
 
@@ -308,7 +305,7 @@ private:
     WINDOW* assistant_win;
     WINDOW* bash_win;
     WINDOW* current_win;
-    char *shell = "/bin/bash";
+    const char *shell = "/bin/bash";
 
     int pty_master, pty_slave;
     
@@ -418,9 +415,6 @@ private:
         wrefresh(outer_assistant_win);
         wrefresh(bash_win);
         wrefresh(assistant_win);
-
-        // TODO: remove this
-        switch_focus(); 
     }
 
     void cleanup() {
@@ -441,77 +435,14 @@ private:
         }
 
         // Change the background color for the entire window
-        wbkgd(assistant_win, is_assistant_focused ? COLOR_PAIR(1) : COLOR_PAIR(2));
-        wbkgd(bash_win, is_assistant_focused ? COLOR_PAIR(2) : COLOR_PAIR(1));
+        wbkgd(bash_win, is_assistant_focused ? COLOR_PAIR(1) : COLOR_PAIR(2));
+        wbkgd(assistant_win, is_assistant_focused ? COLOR_PAIR(2) : COLOR_PAIR(1));
 
-        // Force a redraw of the entire window to preserve previous content
-        touchwin(assistant_win);
-        touchwin(bash_win);
         wrefresh(assistant_win);
         wrefresh(bash_win);
-
-        // Clear and reset the prompt in the new focused window
-        // command_len = 0;
-        // memset(command, 0, sizeof(command));
-
-        // Find the current cursor position
-        int y, x;
-        getyx(current_win, y, x);
-        if (x >= getmaxx(current_win) - 1) {
-            x = 0;
-            y++;
-        }
-
-        // If we're at the bottom, scroll the window
-        if (y >= getmaxy(current_win) - 1) {
-            wscrl(current_win, 1);
-            y = getmaxy(current_win) - 2;
-        }
-
-        wmove(current_win, y, x); // Move cursor to the correct position
-        wrefresh(current_win);
-
     }
 
-    // void execute_command(const std::string& command) {
-    //     int x, y;
-    //     getyx(current_win, y, x);
-
-    //     wmove(current_win, y, 1);
-    //     wclrtoeol(current_win);
-    //     wrefresh(current_win);
-
-    //     FILE* fp = popen(command.c_str(), "r");
-    //     if (fp == nullptr) {
-    //         wprintw(current_win, "Failed to run command\n");
-    //         wrefresh(current_win);
-    //         return;
-    //     }
-
-    //     char buffer[128];
-    //     while (fgets(buffer, sizeof(buffer), fp) != nullptr) {
-    //         wprintw(current_win, "%s", buffer);
-    //         getyx(current_win, y, x);
-    //         if (y >= getmaxy(current_win) - 2) {
-    //             wscrl(current_win, 1);
-    //             y = getmaxy(current_win) - 2;
-    //         }
-    //         wmove(current_win, y, 1);
-    //         wrefresh(current_win);
-    //     }
-    //     pclose(fp);
-
-    //     getyx(current_win, y, x);
-    //     y++;
-    //     wmove(current_win, y, 1);
-    //     wclrtoeol(current_win);
-
-    //     wprintw(current_win, "%s> ", is_assistant_focused ? "assistant" : "bash");
-    //     wrefresh(current_win);
-    // }
-
     void run_terminal() {
-        int ch;
         fd_set fds;
 
         winsize w;
@@ -604,38 +535,19 @@ private:
                 }
 
                 if (escape_status == ANSI_IN_ESCAPE) {
-                    escape_seq += buffer[i];
-
-                    if (buffer[i] == '[') {
-                        escape_status = ANSI_IN_ESCAPE_CSI;
-                    } else if (buffer[i] == 0x5C) {
+                    if (buffer[i] == 0x5B) {
+                        escape_seq += buffer[i];
+                    } else if (buffer[i] == 0x9C) {
+                        escape(escape_seq, bash_screen);
+                        escape_status = ANSI_NULL;
+                        escape_seq = "";
+                    } else if ((buffer[i] >= 0x40 && buffer[i] <= 0x7E) || (buffer[i] == 0x9C)) {
+                        escape_seq += buffer[i];
                         escape(escape_seq, bash_screen);
                         escape_status = ANSI_NULL;
                         escape_seq = "";
                     } else {
-                        escape_status = ANSI_IN_ESCAPE_OTHER;
-                    }
-
-                    continue;
-                }
-
-                if (escape_status == ANSI_IN_ESCAPE_CSI) {
-                    escape_seq += buffer[i];
-
-                    if (buffer[i] >= 0x40 && buffer[i] <= 0x7E) {
-                        escape(escape_seq, bash_screen);
-                        escape_status = ANSI_NULL;
-                        escape_seq = "";
-                    }
-
-                    continue;
-                }
-
-                if (escape_status == ANSI_IN_ESCAPE_OTHER) {
-                    if (buffer[i] == 0x9C) {
-                        escape(escape_seq, bash_screen);
-                        escape_status = ANSI_NULL;
-                        escape_seq = "";
+                        escape_seq += buffer[i];
                     }
 
                     continue;
@@ -654,9 +566,16 @@ private:
 
         if (current_win == bash_win) {
             ch = wgetch(bash_win);
-            handle_shell_input(ch);
         } else {
             ch = wgetch(assistant_win);
+        }
+
+        if (ch == 0x11) {
+            // Pressed ^Q
+            switch_focus();
+        } else if (current_win == bash_win) {
+            handle_shell_input(ch);
+        } else {
             // Pressed ^D
             if (ch == 0x04) {
                 return 0;
@@ -669,53 +588,6 @@ private:
     void handle_shell_input(int ch) {
         write(pty_master, &ch, 1);
     }
-
-    // void handle_input(int ch) {
-    //     if (ch == '\t' && (ch & CTRL('I'))) { // Ctrl + Tab
-    //         switch_focus();
-    //     } else {
-    //         switch (ch) {
-    //             case '\n':
-    //                 if (command_len > 0) {
-    //                     command[command_len] = '\0';
-    //                     std::string command_str(command);
-    //                     execute_command(command_str);
-    //                     command_len = 0;
-    //                     memset(command, 0, sizeof(command));
-    //                 }
-    //                 break;
-    //             case KEY_BACKSPACE:
-    //             case 127:
-    //                 if (command_len > 0) {
-    //                     command_len--;
-    //                     int x, y;
-    //                     getyx(current_win, y, x);
-    //                     mvwdelch(current_win, y, x - 1);
-    //                 }
-    //                 break;
-    //             default:
-    //                 if (command_len < sizeof(command) - 1) {
-    //                     int y, x;
-    //                     getyx(current_win, y, x);
-    //                     if (x < getmaxx(current_win) - 2 && y > 0 && y < getmaxy(current_win) - 1) {
-    //                         command[command_len++] = ch;
-    //                         waddch(current_win, ch);
-    //                     } else if (x >= getmaxx(current_win) - 2) {
-    //                         x = 1;
-    //                         y++;
-    //                         if (y < getmaxy(current_win) - 1) {  
-    //                             wmove(current_win, y, x);
-    //                             command[command_len++] = ch;
-    //                             waddch(current_win, ch);
-    //                         }
-    //                     }
-    //                 }
-    //             break;
-
-    //         }
-    //         wrefresh(current_win);
-    //     }
-    // }
 };
 
 int main() {
