@@ -8,9 +8,17 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <regex>
+#include <sys/epoll.h>
+#include <stdlib.h>
 
 #define ANSI_NULL 0
 #define ANSI_IN_ESCAPE 1
+
+#define MAX_EVENTS 5
+
+void (*old_callback)(int);
+
+void sig_handler(int);
 
 class Screen {
 public:
@@ -18,6 +26,10 @@ public:
 
     Screen(int lines, int cols, WINDOW *window) {
         init(lines, cols, window);
+    }
+
+    Screen(int lines, int cols, WINDOW *window, Screen &old_screen) {
+        init(lines, cols, window, old_screen);
     }
 
     int get_n_lines() {
@@ -231,6 +243,87 @@ private:
             memset(lines[i].data, 0, n_cols);
         }
     }
+
+    void init(int new_lines, int new_cols, WINDOW *new_window, Screen &old_screen) {
+        init(new_lines, new_cols, new_window);
+
+        int new_y = n_lines - 1;
+        std::string line = "";
+        bool begun = false;
+
+        for (int i = old_screen.n_lines - 1; i >= 0; i--) {
+            for (int j = old_screen.n_cols - 1; j >= 0; j--) {
+                if (old_screen.lines[i].data[j] != 0) {
+                    begun = true;
+                    line = old_screen.lines[i].data[j] + line;
+                }
+            }
+
+            if (begun && (i == 0 || !old_screen.lines[i - 1].wrapped)) {
+                // Finish line
+                int line_length = line.length();
+                int translated_lines = line_length / n_cols;
+                if (translated_lines * n_cols != line_length) {
+                    translated_lines += 1;
+                }
+
+                int col = 0;
+                int y = new_y - translated_lines + 1;
+
+                int c_pos = 0;
+                while (y < 0) {
+                    y++;
+                    c_pos += new_cols;
+                }
+
+                for (; c_pos < line_length; c_pos++) {
+                    lines[y].data[col] = line[c_pos];
+                    col++;
+                    if (col == n_cols) {
+                        if (y < new_y) {
+                            lines[y].wrapped = true;
+                        }
+                        col = 0;
+                        y++;
+                    }
+                }
+
+                new_y = new_y - translated_lines;
+                line = "";
+
+                if (new_y < 0) {
+                    // Can't fit anymore...
+                    break;
+                }
+            }
+        }
+
+        // Bump text up if empty spaces
+        if (new_y >= 0) {
+            int to_bump = new_y + 1;
+            for (int i = 0; i < new_lines - to_bump; i++) {
+                lines[i] = lines[i + to_bump];
+            }
+
+            for (int i = new_lines - to_bump; i < new_lines; i++) {
+                lines[i].data = new char[new_cols];
+                memset(lines[i].data, 0, new_cols);
+                lines[i].wrapped = false;
+            }
+        }
+
+        // Draw text
+        wclear(window);
+        for (int i = 0; i < n_lines; i++) {
+            for (int j = 0; j < n_cols; j++) {
+                if (lines[i].data[j] != 0) {
+                    mvwaddch(window, i, j, lines[i].data[j]);
+                }
+            }
+        }
+
+        wrefresh(window);
+    }
 };
 
 void escape(std::string &seq, Screen &bash_screen) {
@@ -301,10 +394,15 @@ public:
         run_terminal();
     }
 
+    void resize() {
+        delete_windows();
+        clear();
+        refresh();
+        create_wins_draw(&bash_screen);
+    }
+
 private:
-    WINDOW* assistant_win;
-    WINDOW* bash_win;
-    WINDOW* current_win;
+    WINDOW *assistant_win, *bash_win, *current_win, *outer_assistant_win, *outer_bash_win;
     const char *shell = "/bin/bash";
 
     int pty_master, pty_slave;
@@ -357,22 +455,12 @@ private:
             close(pty_slave);
 
             init_nc();
+
+            old_callback = signal(SIGWINCH, sig_handler);
         }
     }
 
     void init_nc() {
-        WINDOW *outer_assistant_win, *outer_bash_win;
-
-        int rows, cols;
-        getmaxyx(stdscr, rows, cols);
-
-        refresh();
-
-        // Wait for 30 seconds before proceeding
-        // sleep(30);
-        // clear();
-        // refresh();
-
         initscr();
         raw();
         nodelay(stdscr, TRUE);
@@ -383,8 +471,13 @@ private:
         noecho();
         keypad(stdscr, TRUE);
 
-        getmaxyx(stdscr, rows, cols);
+        create_wins_draw(NULL);
+    }
 
+    void create_wins_draw(Screen *old_screen) {
+        int rows, cols;
+
+        getmaxyx(stdscr, rows, cols);
 
         // Create the windows with proper spacing
         outer_assistant_win = newwin(rows / 2 - 1, cols - 4, 1, 2);
@@ -397,7 +490,15 @@ private:
 
         bash_win = subwin(outer_bash_win, bash_lines, bash_cols, rows / 2 + 2, 3);
 
-        bash_screen = Screen(bash_lines, bash_cols, bash_win);
+        if (old_screen == NULL) {
+            bash_screen = Screen(bash_lines, bash_cols, bash_win);
+        } else {
+            bash_screen = Screen(bash_lines, bash_cols, bash_win, *old_screen);
+        }
+
+        // enable these = can no longer bksp in bash.
+        //keypad(bash_win, TRUE);
+        //keypad(assistant_win, TRUE);
 
         // Draw borders around the windows
         //box(outer_assistant_win, 0, 0);
@@ -417,9 +518,15 @@ private:
         wrefresh(assistant_win);
     }
 
-    void cleanup() {
+    void delete_windows() {
+        delwin(outer_assistant_win);
+        delwin(outer_bash_win);
         delwin(assistant_win);
         delwin(bash_win);
+    }
+
+    void cleanup() {
+        delete_windows();
         endwin();
     }
 
@@ -455,33 +562,66 @@ private:
             exit(EXIT_FAILURE);
         }
 
-        while (1) {
-            FD_ZERO(&fds);
-            
-            // Add stdin (user input)
-            FD_SET(STDIN_FILENO, &fds);
+        // Create an epoll instance
+        int epoll_fd = epoll_create1(0);
+        if (epoll_fd == -1) {
+            perror("epoll_create1");
+            exit(EXIT_FAILURE);
+        }
 
-            // Add pty (shell output)
-            FD_SET(pty_master, &fds);
+        // Add stdin to the epoll instance
+        struct epoll_event event;
+        event.events = EPOLLIN;
+        event.data.fd = STDIN_FILENO;
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, STDIN_FILENO, &event) == -1) {
+            perror("epoll_ctl: stdin");
+            exit(EXIT_FAILURE);
+        }
 
-            select(pty_master + 1, &fds, NULL, NULL, NULL);
+        // Add pty (shell output)
+        event.events = EPOLLIN;
+        event.data.fd = pty_master;
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, pty_master, &event) == -1) {
+            perror("epoll_ctl: pty_master");
+            exit(EXIT_FAILURE);
+        }
 
-            // User input
-            if (FD_ISSET(STDIN_FILENO, &fds)) {
-                int n = handle_input();
-                if (n == 0) {
-                    break;
+        struct epoll_event events[MAX_EVENTS];
+        bool epolling = true;
+
+        while (epolling) {
+            int n = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
+
+            if (n < 0) {
+                if (errno == EINTR) {
+                    // :(
+                    continue;
                 }
+
+                perror("epoll_wait");
+                exit(EXIT_FAILURE);
             }
 
-            // Shell output
-            if (FD_ISSET(pty_master, &fds)) {
-                int n = handle_shell_output(bash_win, pty_master);
-                if (n <= 0) { 
-                    break;
+            for (int i = 0; i < n; i++) {
+                if (events[i].data.fd == STDIN_FILENO) {
+                    // User input
+                    int n_in = handle_input();
+                    if (n_in == 0) {
+                        epolling = false;
+                        break;
+                    }    
+                } else if (events[i].data.fd == pty_master) {
+                    // Shell output
+                    int n_pty = handle_shell_output(bash_win, pty_master);
+                    if (n_pty <= 0) { 
+                        epolling = false;
+                        break;
+                    }
                 }
             }
         }
+
+        close(epoll_fd);
     }
 
     int handle_shell_output(WINDOW *window, int fd) {
@@ -570,7 +710,9 @@ private:
             ch = wgetch(assistant_win);
         }
 
-        if (ch == 0x11) {
+        if (ch == KEY_RESIZE) {
+            // Handled by SIG HANDLER
+        } else if (ch == 0x11) {
             // Pressed ^Q
             switch_focus();
         } else if (current_win == bash_win) {
@@ -590,8 +732,16 @@ private:
     }
 };
 
+TerminalMultiplexer tmux;
+
+void sig_handler(int sig) {
+    if (sig == SIGWINCH) {
+        old_callback(sig);
+        tmux.resize();
+    }
+}
+
 int main() {
-    TerminalMultiplexer tmux;
     tmux.run();
     return 0;
 }
