@@ -14,6 +14,10 @@
 #define ANSI_NULL 0
 #define ANSI_IN_ESCAPE 1
 
+#define FOCUS_NONE 0
+#define FOCUS_ASSISTANT 1
+#define FOCUS_BASH 2
+
 #define MAX_EVENTS 5
 
 void (*old_callback)(int);
@@ -382,7 +386,7 @@ void escape(std::string &seq, Screen &bash_screen) {
 
 class TerminalMultiplexer {
 public:
-    TerminalMultiplexer() : assistant_win(nullptr), bash_win(nullptr), current_win(nullptr) {
+    TerminalMultiplexer() : assistant_win(nullptr), bash_win(nullptr) {
         init();
     }
 
@@ -395,6 +399,7 @@ public:
     }
 
     void resize() {
+        send_dims();
         delete_windows();
         clear();
         refresh();
@@ -402,10 +407,11 @@ public:
     }
 
 private:
-    WINDOW *assistant_win, *bash_win, *current_win, *outer_assistant_win, *outer_bash_win;
+    WINDOW *assistant_win, *bash_win, *outer_assistant_win, *outer_bash_win;
     const char *shell = "/bin/bash";
 
     int pty_master, pty_slave;
+    int focus = FOCUS_NONE;
     
     Screen bash_screen;
 
@@ -453,6 +459,19 @@ private:
         } else {
             // Parent process will handle the Terminal Emulator
             close(pty_slave);
+
+            // Set the master as non-blocking
+            int rv = fcntl(pty_master, F_GETFL, 0);
+            if (rv < 0) {
+                perror("fcntl: F_GETFL");
+                exit(EXIT_FAILURE);
+            }
+
+            rv |= O_NONBLOCK;
+            if (fcntl(pty_master, F_SETFL, rv) < 0) {
+                perror("fcntl: F_SETFL");
+                exit(EXIT_FAILURE);
+            }
 
             init_nc();
 
@@ -508,10 +527,13 @@ private:
         // Print the prompts aligned correctly
         wprintw(assistant_win, "assistant>");
 
-        // Set the focus on the assistant window
-        current_win = assistant_win;
-        wbkgd(assistant_win, COLOR_PAIR(1));
-        wbkgd(bash_win, COLOR_PAIR(2));
+        // Set the focus on the assistant window if unfocused
+        if (focus == FOCUS_NONE) {
+            focus = FOCUS_ASSISTANT;
+        }
+
+        wbkgd(assistant_win, (focus == FOCUS_ASSISTANT) ? COLOR_PAIR(1) : COLOR_PAIR(2));
+        wbkgd(bash_win, (focus == FOCUS_ASSISTANT) ? COLOR_PAIR(2) : COLOR_PAIR(1));
         wrefresh(outer_bash_win);
         wrefresh(outer_assistant_win);
         wrefresh(bash_win);
@@ -533,25 +555,21 @@ private:
     void switch_focus() {
         // Toggle the focus state
 
-        bool is_assistant_focused = (current_win == assistant_win);
-
-        if (is_assistant_focused) {
-            current_win = bash_win;
+        if (focus == FOCUS_ASSISTANT) {
+            focus = FOCUS_BASH;
         } else {
-            current_win = assistant_win;
+            focus = FOCUS_ASSISTANT;
         }
 
         // Change the background color for the entire window
-        wbkgd(bash_win, is_assistant_focused ? COLOR_PAIR(1) : COLOR_PAIR(2));
-        wbkgd(assistant_win, is_assistant_focused ? COLOR_PAIR(2) : COLOR_PAIR(1));
+        wbkgd(assistant_win, (focus == FOCUS_ASSISTANT) ? COLOR_PAIR(1) : COLOR_PAIR(2));
+        wbkgd(bash_win, (focus == FOCUS_ASSISTANT) ? COLOR_PAIR(2) : COLOR_PAIR(1));
 
         wrefresh(assistant_win);
         wrefresh(bash_win);
     }
 
-    void run_terminal() {
-        fd_set fds;
-
+    void send_dims() {
         winsize w;
         memset(&w, 0, sizeof(w));
         w.ws_row = bash_screen.get_n_lines();
@@ -561,6 +579,12 @@ private:
             perror("ioctl");
             exit(EXIT_FAILURE);
         }
+    }
+
+    void run_terminal() {
+        fd_set fds;
+
+        send_dims();        
 
         // Create an epoll instance
         int epoll_fd = epoll_create1(0);
@@ -631,8 +655,14 @@ private:
         char buffer[256];
         int n = read(pty_master, buffer, sizeof(buffer));
 
-        if (n < -1) {
-            // PTY set EIO (-1) for closure for some reason...
+        if (n < 0) {
+            if (errno == EIO) {
+                // PTY set EIO (-1) for closure for some reason...
+                return -1;
+            } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                return 1;
+            }
+            
             perror("read");
             exit(EXIT_FAILURE);
         }
@@ -704,7 +734,7 @@ private:
     int handle_input() {
         int ch;
 
-        if (current_win == bash_win) {
+        if (focus == FOCUS_BASH) {
             ch = wgetch(bash_win);
         } else {
             ch = wgetch(assistant_win);
@@ -715,7 +745,7 @@ private:
         } else if (ch == 0x11) {
             // Pressed ^Q
             switch_focus();
-        } else if (current_win == bash_win) {
+        } else if (focus == FOCUS_BASH) {
             handle_shell_input(ch);
         } else {
             // Pressed ^D
