@@ -779,29 +779,39 @@ private:
     }
 
     int handle_input() {
-        int ch;
+        /*
+        problem when using wgetch: KEY_RESIZE does not wake up the epoll event.
+        solution: use custom SIGWINCH handler
 
-        if (focus == FOCUS_BASH) {
-            ch = wgetch(bash_win);
-        } else {
-            ch = wgetch(assistant_win);
+        new problem: once too many unread KEY_RESIZEs accumulate, wgetch breaks. (it will return KEY_RESIZE on each call)
+        therefore, read straight from stdin; do not use wgetch.
+        */
+
+        char buf[256];
+        int n = read(STDIN_FILENO, buf, sizeof(buf));
+
+        if (n < 0) {
+            perror("read");
+            exit(EXIT_FAILURE);
         }
 
-        if (ch == KEY_RESIZE) {
-            // Handled by SIG HANDLER
-        } else if (ch == 0x11) {
-            // Pressed ^Q
-            switch_focus();
-        } else if (focus == FOCUS_BASH) {
-            handle_shell_input(ch);
-        } else {
-            // Pressed ^D
-            if (ch == 0x04) {
-                return 0;
+        for (int i = 0; i < n; i++) {
+            int ch = buf[i];
+            
+            if (ch == 0x11) {
+                // Pressed ^Q
+                switch_focus();
+            } else if (focus == FOCUS_BASH) {
+                handle_shell_input(ch);
+            } else {
+                // Pressed ^D
+                if (ch == 0x04) {
+                    return 0;
+                }
             }
         }
 
-        return 1;
+        return n;
     }
 
     void handle_shell_input(int ch) {
