@@ -9,6 +9,8 @@
 #include <signal.h>
 #include <regex>
 #include <sys/epoll.h>
+#include <sys/signalfd.h>
+#include <signal.h>
 #include <stdlib.h>
 
 #define ANSI_NULL 0
@@ -19,10 +21,6 @@
 #define FOCUS_BASH 2
 
 #define MAX_EVENTS 5
-
-void (*old_callback)(int);
-
-void sig_handler(int);
 
 class Screen {
 public:
@@ -398,14 +396,6 @@ public:
         run_terminal();
     }
 
-    void resize() {
-        send_dims();
-        delete_windows();
-        clear();
-        refresh();
-        create_wins_draw(&bash_screen);
-    }
-
 private:
     WINDOW *assistant_win, *bash_win, *outer_assistant_win, *outer_bash_win;
     const char *shell = "/bin/bash";
@@ -474,8 +464,6 @@ private:
             }
 
             init_nc();
-
-            old_callback = signal(SIGWINCH, sig_handler);
         }
     }
 
@@ -581,6 +569,14 @@ private:
         }
     }
 
+    void resize() {
+        send_dims();
+        delete_windows();
+        clear();
+        refresh();
+        create_wins_draw(&bash_screen);
+    }
+
     void run_terminal() {
         fd_set fds;
 
@@ -607,6 +603,40 @@ private:
         event.data.fd = pty_master;
         if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, pty_master, &event) == -1) {
             perror("epoll_ctl: pty_master");
+            exit(EXIT_FAILURE);
+        }
+
+        struct sigaction sa_old;
+        sigset_t mask;
+
+        // Get the existing signal handler for SIGWINCH
+        if (sigaction(SIGWINCH, NULL, &sa_old) == -1) {
+            perror("sigaction");
+            exit(EXIT_FAILURE);
+        }
+
+        // Block the SIGWINCH signal
+        sigemptyset(&mask);
+        sigaddset(&mask, SIGWINCH);
+        if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1) {
+            perror("sigprocmask");
+            exit(EXIT_FAILURE);
+        }
+
+        // Add signal SIGWINCH to catch window resizes
+        sigemptyset(&mask);
+        sigaddset(&mask, SIGWINCH);
+
+        int sigfd = signalfd(-1, &mask, 0);
+        if (sigfd < 0) {
+            perror("signalfd");
+            exit(EXIT_FAILURE);
+        }
+
+        event.events = EPOLLIN;
+        event.data.fd = sigfd;
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, sigfd, &event) == -1) {
+            perror("epoll_ctl: sigfd");
             exit(EXIT_FAILURE);
         }
 
@@ -641,6 +671,23 @@ private:
                         epolling = false;
                         break;
                     }
+                } else if (events[i].data.fd == sigfd) {
+                    // Read the signal
+                    struct signalfd_siginfo sigfd_info;
+                    ssize_t s = read(sigfd, &sigfd_info, sizeof(struct signalfd_siginfo));
+
+                    if (s != sizeof(struct signalfd_siginfo)) {
+                        perror("read signalfd");
+                        exit(EXIT_FAILURE);
+                    }
+
+                    // If there was an old signal handler, call it
+                    if (sa_old.sa_handler != SIG_IGN && sa_old.sa_handler != SIG_DFL) {
+                        sa_old.sa_handler(SIGWINCH);
+                    }
+
+                    // Resize
+                    resize();
                 }
             }
         }
@@ -662,7 +709,7 @@ private:
             } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 return 1;
             }
-            
+
             perror("read");
             exit(EXIT_FAILURE);
         }
@@ -762,16 +809,8 @@ private:
     }
 };
 
-TerminalMultiplexer tmux;
-
-void sig_handler(int sig) {
-    if (sig == SIGWINCH) {
-        old_callback(sig);
-        tmux.resize();
-    }
-}
-
 int main() {
+    TerminalMultiplexer tmux;
     tmux.run();
     return 0;
 }
