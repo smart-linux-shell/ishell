@@ -48,29 +48,16 @@ public:
     
         if (curx == getmaxx(window) - 1) {
             if (!cursor_wrapped) {
-                // Write and return to last position, set wrappped
-                waddch(window, ch);
-                wmove(window, cury, curx);
                 lines[cury].wrapped = true;
-                cursor_wrapped = true;
             } else {
-                // Start writing on newline
-                cursor_down();
-                cursor_return();
-                waddch(window, ch);
-                cursor_wrapped = false;
-
                 curx = getcurx(window);
                 cury = getcury(window);
             }
-        } else {
-            // Just write
-            waddch(window, ch);
         }
 
         lines[cury].data[curx] = ch;
 
-        wrefresh(window);
+        show_next_char();
     }
 
     int move_cursor(int y, int x) {
@@ -125,13 +112,14 @@ public:
         }
 
         wclear(window);
+        cursor_wrapped = false;
         wrefresh(window);
     }
 
     void erase_in_place() {
         int curx = getcurx(window);
         int cury = getcury(window);
-        lines[cury].data[curx] = ' ';
+        lines[cury].data[curx] = 0;
 
         if (curx == getmaxx(window) - 1) {
             lines[cury].wrapped = false;
@@ -168,20 +156,17 @@ public:
 
         for (int i = 1; i < n_lines; i++) {
             lines[i - 1] = lines[i];
-            for (int j = 0; j < n_cols; j++) {
-                if (lines[i].data[j] != 0) {
-                    mvwaddch(window, i - 1, j, lines[i].data[j]);
-                } else {
-                    break;
-                }
-            }
         }
 
         lines[n_lines - 1].data = new char[n_cols];
         lines[n_lines - 1].wrapped = false;
         memset(lines[n_lines - 1].data, 0, n_cols);
 
-        move_cursor(n_lines - 1, 0);
+        // Redraw
+        show_all_chars();
+
+        move_cursor(getcury(window) + 1, 0);
+        wrefresh(window);
     }
 
     void scroll_up() {
@@ -197,19 +182,9 @@ public:
         memset(lines[0].data, 0, n_cols);
 
         // Redraw
-        wclear(window);
-
-        for (int i = 1; i < n_lines; i++) {
-            for (int j = 0; j < n_cols; j++) {
-                if (lines[i].data[j] != 0) {
-                    mvwaddch(window, i, j, lines[i].data[j]);
-                } else {
-                    break;
-                }
-            }
-        }
-
+        show_all_chars();
         move_cursor(0, 0);
+        wrefresh(window);
     }
 
     void newline() {
@@ -315,15 +290,77 @@ private:
         }
 
         // Draw text
+        show_all_chars();
+    }
+
+    char show_next_char() {
+        int curx = getcurx(window);
+        int cury = getcury(window);
+
+        char ch = lines[cury].data[curx];
+
+        char orig_ch = ch;
+
+        if (ch == 0) {
+            ch = ' ';
+        }
+    
+        if (curx == getmaxx(window) - 1) {
+            if (!cursor_wrapped) {
+                // Write and return to last position, set wrappped
+                waddch(window, ch);
+                wmove(window, cury, curx);
+                cursor_wrapped = true;
+            } else {
+                // Start writing on newline
+                cursor_down();
+                cursor_return();
+                waddch(window, ch);
+                cursor_wrapped = false;
+            }
+        } else {
+            // Just write
+            waddch(window, ch);
+        }
+
+        wrefresh(window);
+
+        return orig_ch;
+    }
+
+    void show_all_chars() {
         wclear(window);
-        for (int i = 0; i < n_lines; i++) {
+        cursor_wrapped = false;
+        
+        int farthest_x = 0, farthest_y = 0;
+
+        wmove(window, 0, 0);
+
+        for (int i = 0; i < n_lines; i++) { 
             for (int j = 0; j < n_cols; j++) {
-                if (lines[i].data[j] != 0) {
-                    mvwaddch(window, i, j, lines[i].data[j]);
+                char ch = lines[i].data[j];
+
+                if (ch != 0) {
+                    farthest_x = j;
+                    farthest_y = i;
+                } else {
+                    ch = ' ';
                 }
+
+                // Write char
+                mvwaddch(window, i, j, ch);
             }
         }
 
+        if (farthest_x == getmaxx(window) - 1) {
+            // Wrapped
+            cursor_wrapped = true;
+        } else {
+            // Advance
+            farthest_x++;
+        }
+
+        wmove(window, farthest_y, farthest_x);
         wrefresh(window);
     }
 };
