@@ -13,6 +13,8 @@
 #include <signal.h>
 #include <stdlib.h>
 
+#include "assistant.hpp"
+
 #define ANSI_NULL 0
 #define ANSI_IN_ESCAPE 1
 
@@ -437,15 +439,16 @@ private:
     WINDOW *assistant_win, *bash_win, *outer_assistant_win, *outer_bash_win;
     const char *shell = "/bin/bash";
 
-    int pty_master, pty_slave;
+    int pty_bash_master, pty_bash_slave;
+    int pty_assistant_master, pty_assistant_slave;
     int focus = FOCUS_NONE;
     
-    Screen bash_screen;
+    Screen bash_screen, assistant_screen;
 
     void init() {
         // Create a new PTY
-        if (openpty(&pty_master, &pty_slave, NULL, NULL, NULL) == -1) {
-            perror("openpty");
+        if (openpty(&pty_bash_master, &pty_bash_slave, NULL, NULL, NULL) == -1) {
+            perror("openpty: bash");
             exit(EXIT_FAILURE);
         }
 
@@ -453,26 +456,28 @@ private:
         int pid = fork();
 
         if (pid < 0) {
-            perror("fork");
+            perror("fork: bash_pty");
             exit(EXIT_FAILURE);
-        } else if (pid == 0) {
+        } 
+        
+        if (pid == 0) {
             // Child process will execute the shell
-            close(pty_master);
+            close(pty_bash_master);
             setsid();
 
             // Slave becomes the controlling terminal
-            if (ioctl(pty_slave, TIOCSCTTY, NULL) == -1) {
+            if (ioctl(pty_bash_slave, TIOCSCTTY, NULL) == -1) {
                 perror("ioctl TIOCSCTTY");
                 exit(EXIT_FAILURE);
             }
 
             // Duplicate pty slave to standard input/output/error
-            dup2(pty_slave, STDIN_FILENO);
-            dup2(pty_slave, STDOUT_FILENO);
-            dup2(pty_slave, STDERR_FILENO);
+            dup2(pty_bash_slave, STDIN_FILENO);
+            dup2(pty_bash_slave, STDOUT_FILENO);
+            dup2(pty_bash_slave, STDERR_FILENO);
 
             // Close the pty slave as it's now duplicated
-            close(pty_slave);
+            close(pty_bash_slave);
 
             // Set TERM type
             setenv("TERM", "linux-m", 1);
@@ -483,25 +488,71 @@ private:
             // If execl fails
             perror("execl");
             exit(EXIT_FAILURE);
-        } else {
-            // Parent process will handle the Terminal Emulator
-            close(pty_slave);
-
-            // Set the master as non-blocking
-            int rv = fcntl(pty_master, F_GETFL, 0);
-            if (rv < 0) {
-                perror("fcntl: F_GETFL");
-                exit(EXIT_FAILURE);
-            }
-
-            rv |= O_NONBLOCK;
-            if (fcntl(pty_master, F_SETFL, rv) < 0) {
-                perror("fcntl: F_SETFL");
-                exit(EXIT_FAILURE);
-            }
-
-            init_nc();
         }
+
+        close(pty_bash_slave);
+
+        if (openpty(&pty_assistant_master, &pty_assistant_slave, NULL, NULL, NULL) == -1) {
+            perror("openpty: assistant");
+            exit(EXIT_FAILURE);
+        }
+
+        // Fork again
+        pid = fork();
+
+        if (pid < 0) {
+            perror("fork: assistant_pty");
+            exit(EXIT_FAILURE);
+        }
+
+        if (pid == 0) {
+            // Run the assistant
+            close(pty_bash_master);
+            close(pty_assistant_master);
+
+            // Duplicate pty slave
+            dup2(pty_assistant_slave, STDIN_FILENO);
+            dup2(pty_assistant_slave, STDOUT_FILENO);
+            dup2(pty_assistant_slave, STDERR_FILENO);
+
+            close(pty_assistant_slave);
+
+            // Run assistant
+            assistant();
+
+            // Exit
+            exit(EXIT_SUCCESS);
+        }
+
+        close(pty_assistant_slave);
+
+        // Parent process will handle the Terminal Emulator
+        // Set the masters as non-blocking
+        int rv = fcntl(pty_bash_master, F_GETFL, 0);
+        if (rv < 0) {
+            perror("fcntl: F_GETFL");
+            exit(EXIT_FAILURE);
+        }
+
+        rv |= O_NONBLOCK;
+        if (fcntl(pty_bash_master, F_SETFL, rv) < 0) {
+            perror("fcntl: F_SETFL");
+            exit(EXIT_FAILURE);
+        }
+
+        rv = fcntl(pty_assistant_master, F_GETFL, 0);
+        if (rv < 0) {
+            perror("fcntl: F_GETFL");
+            exit(EXIT_FAILURE);
+        }
+
+        rv |= O_NONBLOCK;
+        if (fcntl(pty_assistant_master, F_SETFL, rv) < 0) {
+            perror("fcntl: F_SETFL");
+            exit(EXIT_FAILURE);
+        }
+
+        init_nc();
     }
 
     void init_nc() {
@@ -515,10 +566,41 @@ private:
         noecho();
         keypad(stdscr, TRUE);
 
-        create_wins_draw(NULL);
+        create_wins_draw(NULL, NULL);
     }
 
-    void create_wins_draw(Screen *old_screen) {
+    void refresh_cursor() {
+        if (focus == FOCUS_ASSISTANT) {
+            wcursyncup(assistant_win);
+            wrefresh(assistant_win);
+        } else if (focus == FOCUS_BASH) {
+            wcursyncup(bash_win);
+            wrefresh(bash_win);
+        }
+    }
+
+    void switch_focus() {
+        // Toggle the focus state
+
+        if (focus == FOCUS_NONE) {
+            focus = FOCUS_ASSISTANT;
+        } else if (focus == FOCUS_ASSISTANT) {
+            focus = FOCUS_BASH;
+        } else {
+            focus = FOCUS_ASSISTANT;
+        }
+
+        // Change the background color for the entire window
+        wbkgd(assistant_win, (focus == FOCUS_ASSISTANT) ? COLOR_PAIR(1) : COLOR_PAIR(2));
+        wbkgd(bash_win, (focus == FOCUS_ASSISTANT) ? COLOR_PAIR(2) : COLOR_PAIR(1));
+
+        wrefresh(assistant_win);
+        wrefresh(bash_win);
+
+        refresh_cursor();
+    }
+
+    void create_wins_draw(Screen *old_bash_screen, Screen *old_assistant_screen) {
         int rows, cols;
 
         getmaxyx(stdscr, rows, cols);
@@ -527,6 +609,9 @@ private:
         outer_assistant_win = newwin(rows / 2 - 1, cols - 4, 1, 2);
         outer_bash_win = newwin(rows / 2 - 1, cols - 4, rows / 2 + 1, 2);
 
+        int assistant_lines = rows / 2 - 3;
+        int assistant_cols = cols - 6;
+
         assistant_win = subwin(outer_assistant_win, rows / 2 - 3, cols - 6, 2, 3);
 
         int bash_lines = rows / 2 - 3;
@@ -534,10 +619,16 @@ private:
 
         bash_win = subwin(outer_bash_win, bash_lines, bash_cols, rows / 2 + 2, 3);
 
-        if (old_screen == NULL) {
+        if (old_bash_screen == NULL) {
             bash_screen = Screen(bash_lines, bash_cols, bash_win);
         } else {
-            bash_screen = Screen(bash_lines, bash_cols, bash_win, *old_screen);
+            bash_screen = Screen(bash_lines, bash_cols, bash_win, *old_bash_screen);
+        }
+
+        if (old_assistant_screen == NULL) {
+            assistant_screen = Screen(assistant_lines, assistant_cols, assistant_win);
+        } else {
+            assistant_screen = Screen(assistant_lines, assistant_cols, assistant_win, *old_assistant_screen);
         }
 
         // enable these = can no longer bksp in bash.
@@ -545,24 +636,13 @@ private:
         //keypad(assistant_win, TRUE);
 
         // Draw borders around the windows
-        //box(outer_assistant_win, 0, 0);
         box(outer_assistant_win, 0, 0);
         box(outer_bash_win, 0, 0);
 
-        // Print the prompts aligned correctly
-        wprintw(assistant_win, "assistant>");
-
-        // Set the focus on the assistant window if unfocused
-        if (focus == FOCUS_NONE) {
-            focus = FOCUS_ASSISTANT;
-        }
-
-        wbkgd(assistant_win, (focus == FOCUS_ASSISTANT) ? COLOR_PAIR(1) : COLOR_PAIR(2));
-        wbkgd(bash_win, (focus == FOCUS_ASSISTANT) ? COLOR_PAIR(2) : COLOR_PAIR(1));
         wrefresh(outer_bash_win);
         wrefresh(outer_assistant_win);
-        wrefresh(bash_win);
-        wrefresh(assistant_win);
+
+        switch_focus();
     }
 
     void delete_windows() {
@@ -577,29 +657,12 @@ private:
         endwin();
     }
 
-    void switch_focus() {
-        // Toggle the focus state
-
-        if (focus == FOCUS_ASSISTANT) {
-            focus = FOCUS_BASH;
-        } else {
-            focus = FOCUS_ASSISTANT;
-        }
-
-        // Change the background color for the entire window
-        wbkgd(assistant_win, (focus == FOCUS_ASSISTANT) ? COLOR_PAIR(1) : COLOR_PAIR(2));
-        wbkgd(bash_win, (focus == FOCUS_ASSISTANT) ? COLOR_PAIR(2) : COLOR_PAIR(1));
-
-        wrefresh(assistant_win);
-        wrefresh(bash_win);
-    }
-
     void send_dims() {
         winsize w;
         memset(&w, 0, sizeof(w));
         w.ws_row = bash_screen.get_n_lines();
         w.ws_col = bash_screen.get_n_cols();
-        int rc = ioctl(pty_master, TIOCSWINSZ, &w);
+        int rc = ioctl(pty_bash_master, TIOCSWINSZ, &w);
         if (rc < 0) {
             perror("ioctl");
             exit(EXIT_FAILURE);
@@ -611,7 +674,7 @@ private:
         delete_windows();
         clear();
         refresh();
-        create_wins_draw(&bash_screen);
+        create_wins_draw(&bash_screen, &assistant_screen);
     }
 
     void run_terminal() {
@@ -635,11 +698,19 @@ private:
             exit(EXIT_FAILURE);
         }
 
-        // Add pty (shell output)
+        // Add bash pty (shell output)
         event.events = EPOLLIN;
-        event.data.fd = pty_master;
-        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, pty_master, &event) == -1) {
-            perror("epoll_ctl: pty_master");
+        event.data.fd = pty_bash_master;
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, pty_bash_master, &event) == -1) {
+            perror("epoll_ctl: pty_bash_master");
+            exit(EXIT_FAILURE);
+        }
+
+        // Add assistant pty (assistant output)
+        event.events = EPOLLIN;
+        event.data.fd = pty_assistant_master;
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, pty_assistant_master, &event) == -1) {
+            perror("epoll_ctl: pty_assistant_master");
             exit(EXIT_FAILURE);
         }
 
@@ -701,10 +772,17 @@ private:
                         epolling = false;
                         break;
                     }    
-                } else if (events[i].data.fd == pty_master) {
+                } else if (events[i].data.fd == pty_bash_master) {
                     // Shell output
-                    int n_pty = handle_shell_output(bash_win, pty_master);
+                    int n_pty = handle_screen_output(bash_screen, pty_bash_master);
                     if (n_pty <= 0) { 
+                        epolling = false;
+                        break;
+                    }
+                } else if (events[i].data.fd == pty_assistant_master) {
+                    // Assistant output
+                    int n_pty = handle_screen_output(assistant_screen, pty_assistant_master);
+                    if (n_pty <= 0) {
                         epolling = false;
                         break;
                     }
@@ -732,12 +810,12 @@ private:
         close(epoll_fd);
     }
 
-    int handle_shell_output(WINDOW *window, int fd) {
+    int handle_screen_output(Screen &screen, int fd) {
         static int escape_status = ANSI_NULL;
         static std::string escape_seq = "";
 
         char buffer[256];
-        int n = read(pty_master, buffer, sizeof(buffer));
+        int n = read(fd, buffer, sizeof(buffer));
 
         if (n < 0) {
             if (errno == EIO) {
@@ -757,12 +835,12 @@ private:
             for (int i = 0; i < n; i++) {
                 // CR
                 if (escape_status == ANSI_NULL && buffer[i] == 0x0d) {
-                    bash_screen.cursor_return();
+                    screen.cursor_return();
                     continue;
                 }
 
                 if (escape_status == ANSI_NULL && buffer[i] == '\n') {
-                    bash_screen.newline();
+                    screen.newline();
                     continue;
                 }
 
@@ -778,7 +856,7 @@ private:
 
                 // BKSP
                 if (escape_status == ANSI_NULL && buffer[i] == 0x08) {
-                    bash_screen.cursor_back();
+                    screen.cursor_back();
                     continue;
                 }
 
@@ -792,12 +870,12 @@ private:
                     if (buffer[i] == 0x5B) {
                         escape_seq += buffer[i];
                     } else if (buffer[i] == 0x9C) {
-                        escape(escape_seq, bash_screen);
+                        escape(escape_seq, screen);
                         escape_status = ANSI_NULL;
                         escape_seq = "";
                     } else if ((buffer[i] >= 0x40 && buffer[i] <= 0x7E) || (buffer[i] == 0x9C)) {
                         escape_seq += buffer[i];
-                        escape(escape_seq, bash_screen);
+                        escape(escape_seq, screen);
                         escape_status = ANSI_NULL;
                         escape_seq = "";
                     } else {
@@ -807,10 +885,12 @@ private:
                     continue;
                 }
 
-                bash_screen.write_char(buffer[i]);
+                screen.write_char(buffer[i]);
             }
 
         }
+
+        refresh_cursor();
 
         return n;
     }
@@ -839,7 +919,9 @@ private:
                 // Pressed ^Q
                 switch_focus();
             } else if (focus == FOCUS_BASH) {
-                handle_shell_input(ch);
+                handle_pty_input(pty_bash_master, ch);
+            } else if (focus == FOCUS_ASSISTANT) {
+                handle_pty_input(pty_assistant_master, ch);
             } else {
                 // Pressed ^D
                 if (ch == 0x04) {
@@ -851,8 +933,8 @@ private:
         return n;
     }
 
-    void handle_shell_input(int ch) {
-        write(pty_master, &ch, 1);
+    void handle_pty_input(int fd, int ch) {
+        write(fd, &ch, 1);
     }
 };
 
