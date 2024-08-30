@@ -93,12 +93,14 @@ json make_http_request(HttpRequestType request_type, const std::string& url,
                 break;
         }
 
+        std::string jsonData;
+
         // add body
         if (request_type == HttpRequestType::POST ||
             request_type == HttpRequestType::PUT ||
             request_type == HttpRequestType::PATCH ||
             request_type == HttpRequestType::DELETE) {
-            std::string jsonData = body.dump();
+            jsonData = body.dump();
             curl_easy_setopt(curl, CURLOPT_POSTFIELDS, jsonData.c_str());
         }
 
