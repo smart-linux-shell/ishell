@@ -517,10 +517,5 @@ int TerminalMultiplexer::handle_input() {
 }
 
 void TerminalMultiplexer::handle_pty_input(int fd, char ch) {
-    if (ch == 'j') {
-        int ch2 = KEY_UP;
-        write(fd, &ch2, 1);
-    } else {
-        write(fd, &ch, 1);
-    }
+    write(fd, &ch, 1);
 }
