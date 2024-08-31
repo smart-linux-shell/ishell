@@ -5,6 +5,8 @@
 
 #include <iostream>
 
+#include "agency_request_wrapper.hpp"
+
 void assistant() {
     using_history();
 
@@ -17,7 +19,9 @@ void assistant() {
 
         add_history(input);
 
-        std::cout << "You wrote: " << input << "\n";
+        std::string result = ask_agent("http://127.0.0.1:5000/agents/assistant", std::string(input));
+
+        std::cout << result << "\n";
 
         free(input);
     }

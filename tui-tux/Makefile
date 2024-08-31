@@ -1,10 +1,10 @@
 TARGET := main
-SOURCES := screen_ring_buffer.cpp screen.cpp escape.cpp assistant.cpp terminal_multiplexer.cpp main.cpp
+SOURCES := screen_ring_buffer.cpp screen.cpp escape.cpp assistant.cpp terminal_multiplexer.cpp main.cpp agency_request_wrapper.cpp ../https-client/https_client.cpp
 OBJECTS := $(patsubst %.cpp,%.o,$(SOURCES))
 
 INCLUDE := -I.
 LIBPATH :=
-LIBS := -lncurses -lreadline
+LIBS := -lncurses -lreadline -lcurl
 
 FLAGS := -Wall
 CXXFLAGS := $(FLAGS)
