@@ -1,7 +1,7 @@
 #include "terminal_multiplexer.hpp"
 
 int main() {
-    TerminalMultiplexer tmux;
-    tmux.run();
+    TerminalMultiplexer multiplexer;
+    multiplexer.run();
     return 0;
 }
