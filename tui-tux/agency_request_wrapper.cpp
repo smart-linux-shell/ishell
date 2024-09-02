@@ -4,8 +4,8 @@
 #include <sys/utsname.h>
 #include <string>
 #include <iostream>
-#include "nlohmann/json.hpp"
-#include "../https-client/https_client.h"
+#include "../nlohmann/json.hpp"
+#include "../https-client/https_client.hpp"
 
 using json = nlohmann::json;
 

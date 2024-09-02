@@ -1,7 +1,7 @@
 #include <iostream>
 #include <string>
 #include <curl/curl.h>
-#include "nlohmann/json.hpp"
+#include "../nlohmann/json.hpp"
 #include <sstream>
 #include <map>
 
@@ -166,56 +166,4 @@ json make_http_request(HttpRequestType request_type, const std::string& url,
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
 
     return perform_request(curl);
-}
-
-int main() {
-    std::string url;
-
-    // ex of a GET request with query parameters
-    url = "https://httpbin.org/get";
-    std::map<std::string, std::string> query_params = {{"test", "123"}, {"foo", "bar"}};
-    json get_response = make_http_request(HttpRequestType::GET, url, query_params);
-    std::cout << "GET Response: " << get_response.dump(4) << std::endl;
-
-    // ex of a POST request with a JSON body
-    url = "https://httpbin.org/post";
-    json post_data = {
-        {"name", "John Doe"},
-        {"age", 30},
-        {"email", "johndoe@example.com"}
-    };
-    json post_response = make_http_request(HttpRequestType::POST, url, {}, post_data, {{"Content-Type", "application/json"}});
-    std::cout << "POST Response: " << post_response.dump(4) << std::endl;
-
-    // ex of a DELETE request
-    url = "https://httpbin.org/delete";
-    json delete_response = make_http_request(HttpRequestType::DELETE, url);
-    std::cout << "DELETE Response: " << delete_response.dump(4) << std::endl;
-
-    // ex of a HEAD request
-    url = "https://httpbin.org/get";
-    json head_response = make_http_request(HttpRequestType::HEAD, url);
-    std::cout << "HEAD Response: " << head_response.dump(4) << std::endl;
-
-    // ex of an OPTIONS request
-    url = "https://httpbin.org/get";
-    json options_response = make_http_request(HttpRequestType::OPTIONS, url);
-    std::cout << "OPTIONS Response: " << options_response.dump(4) << std::endl;
-
-    // ex of a PATCH request with a JSON body
-    url = "https://httpbin.org/patch";
-    json patch_data = {
-        {"operation", "update"},
-        {"value", "new_value"}
-    };
-    json patch_response = make_http_request(HttpRequestType::PATCH, url, {}, patch_data, {{"Content-Type", "application/json"}});
-    std::cout << "PATCH Response: " << patch_response.dump(4) << std::endl;
-
-    // ex of a GET request with HTTP
-    url = "http://httpbin.org/get";
-    std::map<std::string, std::string> query_params_http = {{"test", "123"}, {"foo", "bar"}};
-    json get_response_http = make_http_request(HttpRequestType::GET, url, query_params_http);
-    std::cout << "GET Response (HTTP): " << get_response_http.dump(4) << std::endl;
-
-    return 0;
 }
