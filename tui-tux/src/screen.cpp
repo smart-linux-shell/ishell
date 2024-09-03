@@ -1,8 +1,8 @@
 #include <ncurses.h>
 
-#include "screen_ring_buffer.hpp"
+#include "../include/screen_ring_buffer.hpp"
 
-#include "screen.hpp"
+#include "../include/screen.hpp"
 
 Screen::Screen() {}
 

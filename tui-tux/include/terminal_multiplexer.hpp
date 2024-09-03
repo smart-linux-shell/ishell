@@ -1,8 +1,8 @@
 #ifndef ISHELL_TERMINAL_MULTIPLEXER
 #define ISHELL_TERMINAL_MULTIPLEXER
 
-#include "screen.hpp"
-#include "utils.hpp"
+#include "../include/screen.hpp"
+#include "../include/utils.hpp"
 
 class TerminalMultiplexer {
 public:

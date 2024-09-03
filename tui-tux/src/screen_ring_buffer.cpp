@@ -1,7 +1,7 @@
 #include <string>
 #include <string.h>
 
-#include "screen_ring_buffer.hpp"
+#include "../include/screen_ring_buffer.hpp"
 
 ScreenRingBuffer::ScreenRingBuffer() {}
 

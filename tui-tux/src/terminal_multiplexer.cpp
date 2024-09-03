@@ -9,12 +9,12 @@
 #include <errno.h>
 #include <string>
 
-#include "screen.hpp"
-#include "utils.hpp"
-#include "assistant.hpp"
-#include "escape.hpp"
+#include "../include/screen.hpp"
+#include "../include/utils.hpp"
+#include "../include/assistant.hpp"
+#include "../include/escape.hpp"
 
-#include "terminal_multiplexer.hpp"
+#include "../include/terminal_multiplexer.hpp"
 
 TerminalMultiplexer::TerminalMultiplexer() : assistant_win(nullptr), bash_win(nullptr) {
     init();

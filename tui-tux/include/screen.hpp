@@ -3,7 +3,7 @@
 
 #include <ncurses.h>
 
-#include "screen_ring_buffer.hpp"
+#include "../include/screen_ring_buffer.hpp"
 
 class Screen {
 public:

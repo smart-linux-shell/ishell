@@ -1,4 +1,4 @@
-#include "terminal_multiplexer.hpp"
+#include "../include/terminal_multiplexer.hpp"
 
 int main() {
     TerminalMultiplexer multiplexer;
