@@ -5,8 +5,8 @@ OBJECTS := $(patsubst %.cpp,%.o,$(SOURCES))
 OBJECTS := $(patsubst %, bin/%, $(OBJECTS))
 SOURCES := $(patsubst %, src/%, $(SOURCES))
 
-EXT_SOURCES := "../https-client/https_client.cpp"
-EXT_OBJECTS := $(patsubst %.cpp, %.o, $(SOURCES))
+EXT_SOURCES := ../https-client/https_client.cpp
+EXT_OBJECTS := $(patsubst %.cpp, %.o, $(EXT_SOURCES))
 
 INCLUDE := -I.
 LIBPATH :=
@@ -27,7 +27,9 @@ bin/%.o: src/%.cpp
 	$(Cxx) $(CXXFLAGS) $(INCLUDE) -c $< -o $@
 
 .PHONY: clean
+FLAGS := -Wall
 
 clean:
 	rm -f $(OBJECTS)
+	rm -f $(EXT_OBJECTS)
 	rm -f $(TARGET)
