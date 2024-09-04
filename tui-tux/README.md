@@ -10,6 +10,10 @@ The terminal multiplexer allows you to run and interact with two terminal sessio
 
 **Bash terminal** is a pseudo terminal that supports running commands and interactive applications, just like a regular terminal.
 
+### Demo 
+
+![demo](https://github.com/user-attachments/assets/f69ac166-447c-4c0f-bece-027fee7c84ba)
+
 ### Shortcuts
 
 - **Focus Switching**: Easily switch focus between the two terminals using the `Ctrl + Q` shortcut.
