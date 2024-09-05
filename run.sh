@@ -21,6 +21,12 @@ install_package() {
     sudo apt-get install -y "$1"
 }
 
+if ! [ -f "$JSON_DIR/json.hpp" ]; then
+    echo "Downloading nlohmann/json.hpp..."
+    mkdir -p "$JSON_DIR"
+    wget https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp -O "$JSON_DIR/json.hpp"
+fi
+
 if [ -d "$PROJECT_DIR" ]; then
     cd "$PROJECT_DIR" || exit
 else
