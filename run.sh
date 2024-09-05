@@ -8,6 +8,8 @@ DEPENDENCIES=(
     "libcurl4-openssl-dev"
 )
 
+JSON_DIR="nlohmann"
+
 is_package_installed() {
     dpkg -s "$1" &> /dev/null
     return $?
