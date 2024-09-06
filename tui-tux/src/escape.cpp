@@ -1,7 +1,7 @@
 #include <string>
 #include <regex>
 
-#include "screen.hpp"
+#include "../include/screen.hpp"
 
 void escape(std::string &seq, Screen &bash_screen) {
     std::regex clear_regex("^\\[J$");

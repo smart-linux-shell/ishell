@@ -1,17 +1,17 @@
 #include <ncurses.h>
 
-#include "screen_ring_buffer.hpp"
+#include "../include/screen_ring_buffer.hpp"
 
-#include "screen.hpp"
+#include "../include/screen.hpp"
 
 Screen::Screen() {}
 
-Screen::Screen(int lines, int cols, WINDOW *window) {
-    init(lines, cols, window);
+Screen::Screen(int lines, int cols, WINDOW *window, WINDOW *outer, int pty_master) {
+    init(lines, cols, window, outer, pty_master);
 }
 
-Screen::Screen(int lines, int cols, WINDOW *window, Screen &old_screen) {
-    init(lines, cols, window, old_screen);
+Screen::Screen(int lines, int cols, WINDOW *window, WINDOW *outer, Screen &old_screen) {
+    init(lines, cols, window, outer, old_screen);
 }
 
 int Screen::get_n_lines() {
@@ -149,15 +149,30 @@ void Screen::newline() {
     wrefresh(window);
 }
 
-void Screen::init(int new_lines, int new_cols, WINDOW *new_window) {
+WINDOW *Screen::get_window() {
+    return window;
+}
+
+int Screen::get_pty_master() {
+    return pty_master;
+}
+
+void Screen::delete_wins() {
+    delwin(window);
+    delwin(outer);
+}
+
+void Screen::init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *new_outer, int new_pty_master) {
     n_lines = new_lines;
     n_cols = new_cols;
     window = new_window;
+    outer = new_outer;
     buffer = ScreenRingBuffer(new_lines, new_cols, 1024);
+    pty_master = new_pty_master;
 }
 
-void Screen::init(int new_lines, int new_cols, WINDOW *new_window, Screen &old_screen) {
-    init(new_lines, new_cols, new_window);
+void Screen::init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *new_outer, Screen &old_screen) {
+    init(new_lines, new_cols, new_window, new_outer, old_screen.pty_master);
 
     buffer = ScreenRingBuffer(new_lines, new_cols, 1024, old_screen.buffer);
 
@@ -201,6 +216,8 @@ char Screen::show_next_char() {
 }
 
 void Screen::show_all_chars() {
+    bool written_data = false;
+
     wclear(window);
     cursor_wrapped = false;
     
@@ -213,6 +230,7 @@ void Screen::show_all_chars() {
             char ch = buffer.get_char(i, j);
 
             if (ch != 0) {
+                written_data = true;
                 farthest_x = j;
                 farthest_y = i;
             } else {
@@ -224,14 +242,19 @@ void Screen::show_all_chars() {
         }
     }
 
-    if (farthest_x == getmaxx(window) - 1) {
-        // Wrapped
-        cursor_wrapped = true;
+    if (written_data) {
+        if (farthest_x == getmaxx(window) - 1) {
+            // Wrapped
+            cursor_wrapped = true;
+        } else {
+            // Advance
+            farthest_x++;
+        }
+
+        wmove(window, farthest_y, farthest_x);
     } else {
-        // Advance
-        farthest_x++;
+        wmove(window, 0, 0);
     }
 
-    wmove(window, farthest_y, farthest_x);
     wrefresh(window);
 }

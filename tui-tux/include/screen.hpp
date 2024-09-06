@@ -8,8 +8,8 @@
 class Screen {
 public:
     Screen();
-    Screen(int lines, int cols, WINDOW *window);
-    Screen(int lines, int cols, WINDOW *window, Screen &old_screen);
+    Screen(int lines, int cols, WINDOW *window, WINDOW *outer, int pty_master);
+    Screen(int lines, int cols, WINDOW *window, WINDOW *outer, Screen &old_screen);
     int get_n_lines();
     int get_n_cols();
     void write_char(char ch);
@@ -28,17 +28,22 @@ public:
     void scroll_down();
     void scroll_up();
     void newline();
+    WINDOW *get_window();
+    int get_pty_master();
+    void delete_wins();
 
 private:
     int n_lines, n_cols;
     bool cursor_wrapped = false;
+    int pty_master;
 
     WINDOW *window;
+    WINDOW *outer;
 
     ScreenRingBuffer buffer;
 
-    void init(int new_lines, int new_cols, WINDOW *new_window);
-    void init(int new_lines, int new_cols, WINDOW *new_window, Screen &old_screen);
+    void init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *outer, int pty_master);
+    void init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *outer, Screen &old_screen);
     char show_next_char();
     void show_all_chars();
 

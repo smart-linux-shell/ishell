@@ -4,9 +4,7 @@
 #define ANSI_NULL 0
 #define ANSI_IN_ESCAPE 1
 
-#define FOCUS_NONE 0
-#define FOCUS_ASSISTANT 1
-#define FOCUS_BASH 2
+#define FOCUS_NULL -1
 
 #define MAX_EVENTS 5
 

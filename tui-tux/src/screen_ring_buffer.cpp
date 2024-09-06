@@ -1,7 +1,7 @@
 #include <string>
 #include <string.h>
 
-#include "screen_ring_buffer.hpp"
+#include "../include/screen_ring_buffer.hpp"
 
 ScreenRingBuffer::ScreenRingBuffer() {}
 
@@ -94,7 +94,7 @@ int ScreenRingBuffer::new_line(int terminal_y) {
 
 int ScreenRingBuffer::clear() {
     start_line = 0;
-    filled_lines = 1;
+    filled_lines = 0;
     terminal_begin_line = 0;
 
     lines = new Line[max_lines];
@@ -123,6 +123,8 @@ void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines
     std::string line = "";
 
     bool last_line = true;
+
+    // Resizing old buffer to current buffer
 
     // Write from the last line up.
     for (int i = old_buffer.filled_lines - 1; i >= 0; i--) {

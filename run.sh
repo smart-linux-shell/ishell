@@ -8,7 +8,7 @@ DEPENDENCIES=(
     "libcurl4-openssl-dev"
 )
 
-JSON_DIR="nlohmann"
+JSON_DIR="tui-tux/nlohmann"
 
 is_package_installed() {
     dpkg -s "$1" &> /dev/null
@@ -57,13 +57,13 @@ else
     exit 1
 fi
 
-if [ -x "./main" ]; then
-    echo "Executable 'main' found."
+if [ -x "./ishell" ]; then
+    echo "Executable 'ishell' found."
 else
-    echo "Error: Executable 'main' not found. Build might have failed."
+    echo "Error: Executable 'ishell' not found. Build might have failed."
     exit 1
 fi
 
 # Run the main executable
 echo "Running the program..."
-./main
+./ishell

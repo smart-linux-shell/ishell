@@ -9,14 +9,14 @@
 #include <errno.h>
 #include <string>
 
-#include "screen.hpp"
-#include "utils.hpp"
-#include "assistant.hpp"
-#include "escape.hpp"
+#include "../include/screen.hpp"
+#include "../include/utils.hpp"
+#include "../include/assistant.hpp"
+#include "../include/escape.hpp"
 
-#include "terminal_multiplexer.hpp"
+#include "../include/terminal_multiplexer.hpp"
 
-TerminalMultiplexer::TerminalMultiplexer() : assistant_win(nullptr), bash_win(nullptr) {
+TerminalMultiplexer::TerminalMultiplexer() {
     init();
 }
 
@@ -30,6 +30,8 @@ void TerminalMultiplexer::run() {
 
 void TerminalMultiplexer::init() {
     // Create a new PTY
+    int pty_bash_master, pty_bash_slave;
+
     if (openpty(&pty_bash_master, &pty_bash_slave, NULL, NULL, NULL) == -1) {
         perror("openpty: bash");
         exit(EXIT_FAILURE);
@@ -75,6 +77,7 @@ void TerminalMultiplexer::init() {
 
     close(pty_bash_slave);
 
+    int pty_assistant_master, pty_assistant_slave;
     if (openpty(&pty_assistant_master, &pty_assistant_slave, NULL, NULL, NULL) == -1) {
         perror("openpty: assistant");
         exit(EXIT_FAILURE);
@@ -135,6 +138,10 @@ void TerminalMultiplexer::init() {
         exit(EXIT_FAILURE);
     }
 
+    // Create temporary unsized screens
+    screens.push_back(Screen(0, 0, NULL, NULL, pty_assistant_master));
+    screens.push_back(Screen(0, 0, NULL, NULL, pty_bash_master));
+
     init_nc();
 }
 
@@ -148,26 +155,31 @@ void TerminalMultiplexer::init_nc() {
     init_pair(2, COLOR_WHITE, COLOR_BLACK); // Unfocused window
     noecho();
 
-    create_wins_draw(NULL, NULL);
+    create_wins_draw();
 }
 
 void TerminalMultiplexer::refresh_cursor() {
-    if (focus == FOCUS_ASSISTANT) {
-        wcursyncup(assistant_win);
-        wrefresh(assistant_win);
-    } else if (focus == FOCUS_BASH) {
-        wcursyncup(bash_win);
-        wrefresh(bash_win);
+    if (focus != FOCUS_NULL) {
+        wcursyncup(screens[focus].get_window());
+        wrefresh(screens[focus].get_window());
     }
 }
 
 void TerminalMultiplexer::draw_focus() {
     // Change the background color for the entire window
-    wbkgd(assistant_win, (focus == FOCUS_ASSISTANT) ? COLOR_PAIR(1) : COLOR_PAIR(2));
-    wbkgd(bash_win, (focus == FOCUS_ASSISTANT) ? COLOR_PAIR(2) : COLOR_PAIR(1));
+    for (Screen &screen : screens) {
+        // Set unfocused colours
+        wbkgd(screen.get_window(), COLOR_PAIR(2));
+    }
 
-    wrefresh(assistant_win);
-    wrefresh(bash_win);
+    // Set focused colour
+    if (focus != FOCUS_NULL) {
+        wbkgd(screens[focus].get_window(), COLOR_PAIR(1));
+    }
+
+    for (Screen &screen : screens) {
+        wrefresh(screen.get_window());
+    }
 
     refresh_cursor();
 }
@@ -175,51 +187,65 @@ void TerminalMultiplexer::draw_focus() {
 void TerminalMultiplexer::switch_focus() {
     // Toggle the focus state
 
-    if (focus == FOCUS_NONE) {
-        focus = FOCUS_ASSISTANT;
-    } else if (focus == FOCUS_ASSISTANT) {
-        focus = FOCUS_BASH;
+    if (focus == FOCUS_NULL) {
+        focus = 0;
     } else {
-        focus = FOCUS_ASSISTANT;
+        focus = (focus + 1) % screens.size();
     }
 
     draw_focus();
 }
 
-void TerminalMultiplexer::create_wins_draw(Screen *old_bash_screen, Screen *old_assistant_screen) {
+void TerminalMultiplexer::create_wins_draw() {
     int rows, cols;
 
     getmaxyx(stdscr, rows, cols);
 
     // Create the windows with proper spacing
-    outer_assistant_win = newwin(rows / 2 - 1, cols - 4, 1, 2);
-    outer_bash_win = newwin(rows / 2 - 1, cols - 4, rows / 2 + 1, 2);
-
+    WINDOW *outer_assistant_win, *outer_bash_win, *assistant_win, *bash_win;
     int assistant_lines = rows / 2 - 3;
     int assistant_cols = cols - 6;
-
-    assistant_win = subwin(outer_assistant_win, rows / 2 - 3, cols - 6, 2, 3);
 
     int bash_lines = rows / 2 - 3;
     int bash_cols = cols - 6;
 
-    bash_win = subwin(outer_bash_win, bash_lines, bash_cols, rows / 2 + 2, 3);
+    if (zoomed_in) {
+        if (focus == 0) {
+            // First is the assistant window.
+            bash_lines = 0;
+            bash_cols = 0;
+            assistant_lines = rows - 3;
+            outer_assistant_win = newwin(assistant_lines + 2, assistant_cols + 2, 1, 2);
+            outer_bash_win = newwin(0, 0, 0, 0);
+            assistant_win = subwin(outer_assistant_win, rows / 2 - 3, cols - 6, 2, 3);
+            bash_win = subwin(outer_bash_win, 0, 0, 0, 0);
 
-    if (old_bash_screen == NULL) {
-        bash_screen = Screen(bash_lines, bash_cols, bash_win);
+        } else {
+            assistant_lines = 0;
+            assistant_cols = 0;
+            bash_lines = rows - 3;
+            outer_assistant_win = newwin(0, 0, 0, 0);
+            outer_bash_win = newwin(bash_lines + 2, bash_cols + 2, rows / 2 + 1, 2);
+            assistant_win = subwin(outer_assistant_win, 0, 0, 0, 0);
+            bash_win = subwin(outer_bash_win, bash_lines, bash_cols, rows / 2 + 2, 3);
+        }
     } else {
-        bash_screen = Screen(bash_lines, bash_cols, bash_win, *old_bash_screen);
+        outer_assistant_win = newwin(assistant_lines + 2, assistant_cols + 2, 1, 2);
+        outer_bash_win = newwin(bash_lines + 2, bash_cols + 2, rows / 2 + 1, 2);
+        assistant_win = subwin(outer_assistant_win, rows / 2 - 3, cols - 6, 2, 3);
+        bash_win = subwin(outer_bash_win, bash_lines, bash_cols, rows / 2 + 2, 3);
     }
 
-    if (old_assistant_screen == NULL) {
-        assistant_screen = Screen(assistant_lines, assistant_cols, assistant_win);
-    } else {
-        assistant_screen = Screen(assistant_lines, assistant_cols, assistant_win, *old_assistant_screen);
-    }
+    // Resize old screens
+    std::vector<Screen> new_screens;
+    
+    // Assistant
+    new_screens.push_back(Screen(assistant_lines, assistant_cols, assistant_win, outer_assistant_win, screens[0]));
 
-    // enable these = can no longer bksp in bash.
-    //keypad(bash_win, TRUE);
-    //keypad(assistant_win, TRUE);
+    // Bash
+    new_screens.push_back(Screen(bash_lines, bash_cols, bash_win, outer_bash_win, screens[1]));
+
+    screens = new_screens;
 
     // Draw borders around the windows
     box(outer_assistant_win, 0, 0);
@@ -228,7 +254,7 @@ void TerminalMultiplexer::create_wins_draw(Screen *old_bash_screen, Screen *old_
     wrefresh(outer_bash_win);
     wrefresh(outer_assistant_win);
 
-    if (focus == FOCUS_NONE) {
+    if (focus == FOCUS_NULL) {
         switch_focus();
     } else {
         draw_focus();
@@ -236,10 +262,9 @@ void TerminalMultiplexer::create_wins_draw(Screen *old_bash_screen, Screen *old_
 }
 
 void TerminalMultiplexer::delete_windows() {
-    delwin(outer_assistant_win);
-    delwin(outer_bash_win);
-    delwin(assistant_win);
-    delwin(bash_win);
+    for (Screen &screen : screens) {
+        screen.delete_wins();
+    }
 }
 
 void TerminalMultiplexer::cleanup() {
@@ -248,14 +273,16 @@ void TerminalMultiplexer::cleanup() {
 }
 
 void TerminalMultiplexer::send_dims() {
-    winsize w;
-    memset(&w, 0, sizeof(w));
-    w.ws_row = bash_screen.get_n_lines();
-    w.ws_col = bash_screen.get_n_cols();
-    int rc = ioctl(pty_bash_master, TIOCSWINSZ, &w);
-    if (rc < 0) {
-        perror("ioctl");
-        exit(EXIT_FAILURE);
+    for (Screen &screen : screens) {
+        winsize w;
+        memset(&w, 0, sizeof(w));
+        w.ws_row = screen.get_n_lines();
+        w.ws_col = screen.get_n_cols();
+        int rc = ioctl(screen.get_pty_master(), TIOCSWINSZ, &w);
+        if (rc < 0) {
+            perror("ioctl");
+            exit(EXIT_FAILURE);
+        }
     }
 }
 
@@ -263,7 +290,7 @@ void TerminalMultiplexer::resize() {
     delete_windows();
     clear();
     refresh();
-    create_wins_draw(&bash_screen, &assistant_screen);
+    create_wins_draw();
     send_dims();
 }
 
@@ -286,20 +313,15 @@ void TerminalMultiplexer::run_terminal() {
         exit(EXIT_FAILURE);
     }
 
-    // Add bash pty (shell output)
-    event.events = EPOLLIN;
-    event.data.fd = pty_bash_master;
-    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, pty_bash_master, &event) == -1) {
-        perror("epoll_ctl: pty_bash_master");
-        exit(EXIT_FAILURE);
-    }
-
-    // Add assistant pty (assistant output)
-    event.events = EPOLLIN;
-    event.data.fd = pty_assistant_master;
-    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, pty_assistant_master, &event) == -1) {
-        perror("epoll_ctl: pty_assistant_master");
-        exit(EXIT_FAILURE);
+    // Add ptys to epoll instance
+    for (size_t i = 0; i < screens.size(); i++) {
+        struct epoll_event event;
+        event.events = EPOLLIN;
+        event.data.fd = screens[i].get_pty_master();
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, event.data.fd, &event) == -1) {
+            perror("epoll_ctl: pty");
+            exit(EXIT_FAILURE);
+        }
     }
 
     struct sigaction sa_old;
@@ -352,6 +374,7 @@ void TerminalMultiplexer::run_terminal() {
             exit(EXIT_FAILURE);
         }
 
+        // TODO: Fix pty hardcode. Do not use pty vars anymore.
         for (int i = 0; i < n; i++) {
             if (events[i].data.fd == STDIN_FILENO) {
                 // User input
@@ -360,20 +383,6 @@ void TerminalMultiplexer::run_terminal() {
                     epolling = false;
                     break;
                 }    
-            } else if (events[i].data.fd == pty_bash_master) {
-                // Shell output
-                int n_pty = handle_screen_output(bash_screen, pty_bash_master);
-                if (n_pty <= 0) { 
-                    epolling = false;
-                    break;
-                }
-            } else if (events[i].data.fd == pty_assistant_master) {
-                // Assistant output
-                int n_pty = handle_screen_output(assistant_screen, pty_assistant_master);
-                if (n_pty <= 0) {
-                    epolling = false;
-                    break;
-                }
             } else if (events[i].data.fd == sigfd) {
                 // Read the signal
                 struct signalfd_siginfo sigfd_info;
@@ -391,6 +400,19 @@ void TerminalMultiplexer::run_terminal() {
 
                 // Resize
                 resize();
+            } else {
+                // A PTY
+                for (Screen &screen : screens) {
+                    if (screen.get_pty_master() == events[i].data.fd) {
+                        int n_pty = handle_screen_output(screen, events[i].data.fd);
+                        if (n_pty <= 0) {
+                            epolling = false;
+                            break;
+                        }
+
+                        break;
+                    }
+                }
             }
         }
     }
@@ -503,13 +525,22 @@ int TerminalMultiplexer::handle_input() {
     for (int i = 0; i < n; i++) {
         char ch = buf[i];
         
-        if (ch == 0x11) {
-            // Pressed ^Q
-            switch_focus();
-        } else if (focus == FOCUS_BASH) {
-            handle_pty_input(pty_bash_master, ch);
-        } else if (focus == FOCUS_ASSISTANT) {
-            handle_pty_input(pty_assistant_master, ch);
+        if (ch == 0x02) {
+            // Pressed ^B
+            waiting_for_command = true;
+        } else if (waiting_for_command) {
+            waiting_for_command = false;
+            if (ch == '\t') {
+                switch_focus();
+            } else if (ch == 'Z' || ch == 'z') {
+                if (!zoomed_in) {
+                    zoom_in();
+                } else {
+                    zoom_out();
+                }
+            }
+        } else if (focus != FOCUS_NULL) {
+            handle_pty_input(screens[focus].get_pty_master(), ch);
         }
     }
 
@@ -518,4 +549,14 @@ int TerminalMultiplexer::handle_input() {
 
 void TerminalMultiplexer::handle_pty_input(int fd, char ch) {
     write(fd, &ch, 1);
+}
+
+void TerminalMultiplexer::zoom_in() {
+    zoomed_in = true;
+    resize();
+}
+
+void TerminalMultiplexer::zoom_out() {
+    zoomed_in = false;
+    resize();
 }
