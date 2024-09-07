@@ -8,7 +8,7 @@
 class Screen {
 public:
     Screen();
-    Screen(int lines, int cols, WINDOW *window, WINDOW *outer, int pty_master);
+    Screen(int lines, int cols, WINDOW *window, WINDOW *outer, int pty_master, int pid);
     Screen(int lines, int cols, WINDOW *window, WINDOW *outer, Screen &old_screen);
     int get_n_lines();
     int get_n_cols();
@@ -30,23 +30,44 @@ public:
     void newline();
     WINDOW *get_window();
     int get_pty_master();
+    int get_pid();
     void delete_wins();
 
 private:
     int n_lines, n_cols;
     bool cursor_wrapped = false;
+
     int pty_master;
+    int pid;
+
+    // When window is NULL, use these
+    int fallback_y, fallback_x;
 
     WINDOW *window;
     WINDOW *outer;
 
     ScreenRingBuffer buffer;
 
-    void init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *outer, int pty_master);
+    void init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *outer, int new_pty_master, int new_pid);
     void init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *outer, Screen &old_screen);
-    char show_next_char();
+    void show_char(int y, int x);
     void show_all_chars();
 
+public:
+    // Wrappers
+    int srefresh();
+    int sgetx();
+    int sgety();
+    int smove(int y, int x);
+    int sclear();
+    int mvsaddch(int y, int x, chtype ch);
+    int saddch(chtype ch);
+    int sdelch();
+    int sclrtoeol();
+    void scursyncup();
+    int sbkgd(chtype ch);
+    int sbox_outer(chtype ch1, chtype ch2);
+    int srefresh_outer();
 };
 
 #endif

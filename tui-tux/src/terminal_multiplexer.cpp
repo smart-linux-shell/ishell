@@ -38,14 +38,14 @@ void TerminalMultiplexer::init() {
     }
 
     // Fork the process
-    int pid = fork();
+    int bash_pid = fork();
 
-    if (pid < 0) {
+    if (bash_pid < 0) {
         perror("fork: bash_pty");
         exit(EXIT_FAILURE);
     } 
     
-    if (pid == 0) {
+    if (bash_pid == 0) {
         // Child process will execute the shell
         close(pty_bash_master);
         setsid();
@@ -84,14 +84,14 @@ void TerminalMultiplexer::init() {
     }
 
     // Fork again
-    pid = fork();
+    int assistant_pid = fork();
 
-    if (pid < 0) {
+    if (assistant_pid < 0) {
         perror("fork: assistant_pty");
         exit(EXIT_FAILURE);
     }
 
-    if (pid == 0) {
+    if (assistant_pid == 0) {
         // Run the assistant
         close(pty_bash_master);
         close(pty_assistant_master);
@@ -139,9 +139,10 @@ void TerminalMultiplexer::init() {
     }
 
     // Create temporary unsized screens
-    screens.push_back(Screen(0, 0, NULL, NULL, pty_assistant_master));
-    screens.push_back(Screen(0, 0, NULL, NULL, pty_bash_master));
+    screens.push_back(Screen(0, 0, NULL, NULL, pty_assistant_master, assistant_pid));
+    screens.push_back(Screen(0, 0, NULL, NULL, pty_bash_master, bash_pid));
 
+    fgetc(stdin);
     init_nc();
 }
 
@@ -160,8 +161,8 @@ void TerminalMultiplexer::init_nc() {
 
 void TerminalMultiplexer::refresh_cursor() {
     if (focus != FOCUS_NULL) {
-        wcursyncup(screens[focus].get_window());
-        wrefresh(screens[focus].get_window());
+        screens[focus].scursyncup();
+        screens[focus].srefresh();
     }
 }
 
@@ -169,16 +170,14 @@ void TerminalMultiplexer::draw_focus() {
     // Change the background color for the entire window
     for (Screen &screen : screens) {
         // Set unfocused colours
-        wbkgd(screen.get_window(), COLOR_PAIR(2));
+        screen.sbkgd(COLOR_PAIR(2));
     }
 
     // Set focused colour
-    if (focus != FOCUS_NULL) {
-        wbkgd(screens[focus].get_window(), COLOR_PAIR(1));
-    }
+    screens[focus].sbkgd(COLOR_PAIR(1));
 
     for (Screen &screen : screens) {
-        wrefresh(screen.get_window());
+        screen.srefresh();
     }
 
     refresh_cursor();
@@ -186,6 +185,11 @@ void TerminalMultiplexer::draw_focus() {
 
 void TerminalMultiplexer::switch_focus() {
     // Toggle the focus state
+
+    if (zoomed_in) {
+        // Reject
+        return;
+    }
 
     if (focus == FOCUS_NULL) {
         focus = 0;
@@ -212,27 +216,23 @@ void TerminalMultiplexer::create_wins_draw() {
     if (zoomed_in) {
         if (focus == 0) {
             // First is the assistant window.
-            bash_lines = 0;
-            bash_cols = 0;
             assistant_lines = rows - 3;
             outer_assistant_win = newwin(assistant_lines + 2, assistant_cols + 2, 1, 2);
-            outer_bash_win = newwin(0, 0, 0, 0);
-            assistant_win = subwin(outer_assistant_win, rows / 2 - 3, cols - 6, 2, 3);
-            bash_win = subwin(outer_bash_win, 0, 0, 0, 0);
+            outer_bash_win = NULL;
+            assistant_win = subwin(outer_assistant_win, assistant_lines, assistant_cols, 2, 3);
+            bash_win = NULL;
 
         } else {
-            assistant_lines = 0;
-            assistant_cols = 0;
             bash_lines = rows - 3;
-            outer_assistant_win = newwin(0, 0, 0, 0);
-            outer_bash_win = newwin(bash_lines + 2, bash_cols + 2, rows / 2 + 1, 2);
-            assistant_win = subwin(outer_assistant_win, 0, 0, 0, 0);
-            bash_win = subwin(outer_bash_win, bash_lines, bash_cols, rows / 2 + 2, 3);
+            outer_assistant_win = NULL;
+            outer_bash_win = newwin(bash_lines + 2, bash_cols + 2, 1, 2);
+            assistant_win = NULL;
+            bash_win = subwin(outer_bash_win, bash_lines, bash_cols, 2, 3);
         }
     } else {
         outer_assistant_win = newwin(assistant_lines + 2, assistant_cols + 2, 1, 2);
         outer_bash_win = newwin(bash_lines + 2, bash_cols + 2, rows / 2 + 1, 2);
-        assistant_win = subwin(outer_assistant_win, rows / 2 - 3, cols - 6, 2, 3);
+        assistant_win = subwin(outer_assistant_win, assistant_lines, assistant_cols, 2, 3);
         bash_win = subwin(outer_bash_win, bash_lines, bash_cols, rows / 2 + 2, 3);
     }
 
@@ -248,11 +248,11 @@ void TerminalMultiplexer::create_wins_draw() {
     screens = new_screens;
 
     // Draw borders around the windows
-    box(outer_assistant_win, 0, 0);
-    box(outer_bash_win, 0, 0);
-
-    wrefresh(outer_bash_win);
-    wrefresh(outer_assistant_win);
+    for (Screen &screen : screens) {
+        screen.sbox_outer(0, 0);
+        screen.srefresh_outer();
+        screen.srefresh();
+    }
 
     if (focus == FOCUS_NULL) {
         switch_focus();
@@ -283,6 +283,11 @@ void TerminalMultiplexer::send_dims() {
             perror("ioctl");
             exit(EXIT_FAILURE);
         }
+        rc = kill(screen.get_pid(), SIGWINCH);
+        if (rc < 0) {
+            perror("kill: SIGWINCH");
+            exit(EXIT_FAILURE);
+        }
     }
 }
 
@@ -295,7 +300,7 @@ void TerminalMultiplexer::resize() {
 }
 
 void TerminalMultiplexer::run_terminal() {
-    send_dims();        
+    send_dims();
 
     // Create an epoll instance
     int epoll_fd = epoll_create1(0);
@@ -374,7 +379,6 @@ void TerminalMultiplexer::run_terminal() {
             exit(EXIT_FAILURE);
         }
 
-        // TODO: Fix pty hardcode. Do not use pty vars anymore.
         for (int i = 0; i < n; i++) {
             if (events[i].data.fd == STDIN_FILENO) {
                 // User input
