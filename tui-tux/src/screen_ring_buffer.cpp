@@ -85,6 +85,8 @@ int ScreenRingBuffer::new_line(int terminal_y) {
         return 0;
     }
 
+    expand_down();
+
     y = y % max_lines;
 
     lines[y].new_paragraph = true;
@@ -105,6 +107,20 @@ int ScreenRingBuffer::clear() {
     }
 
     return 0;
+}
+
+bool ScreenRingBuffer::has_new_line(int terminal_y) {
+    int y = terminal_begin_line + terminal_y;
+
+    if (is_out_of_terminal_bounds(terminal_y, 0)) {
+        return false;
+    }
+
+    if (is_out_of_bounds(y)) {
+        return false;
+    }
+
+    return lines[y].new_paragraph;
 }
 
 void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines) {
@@ -182,7 +198,7 @@ void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines
     start_line = y + 1;
     filled_lines = max_lines - start_line;
 
-    terminal_begin_line = std::max(start_line, max_lines - terminal_lines - 1);
+    terminal_begin_line = std::max(start_line, max_lines - terminal_lines);
 }
 
 void ScreenRingBuffer::expand_down() {

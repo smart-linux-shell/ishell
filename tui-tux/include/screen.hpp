@@ -5,6 +5,10 @@
 
 #include "screen_ring_buffer.hpp"
 
+struct Pair {
+    int x, y;
+};
+
 class Screen {
 public:
     Screen();
@@ -51,7 +55,7 @@ private:
     void init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *outer, int new_pty_master, int new_pid);
     void init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *outer, Screen &old_screen);
     void show_char(int y, int x);
-    void show_all_chars();
+    Pair show_all_chars();
 
 public:
     // Wrappers

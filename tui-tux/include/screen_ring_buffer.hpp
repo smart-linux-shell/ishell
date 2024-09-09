@@ -12,6 +12,7 @@ public:
     void scroll_up();
     int new_line(int terminal_y);
     int clear();
+    bool has_new_line(int terminal_y);
 
 private:
     int terminal_lines, terminal_cols, max_lines;

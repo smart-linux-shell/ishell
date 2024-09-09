@@ -212,7 +212,8 @@ void Screen::init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *new_o
     buffer = ScreenRingBuffer(new_lines, new_cols, 1024, old_screen.buffer);
 
     // Draw text
-    show_all_chars();
+    Pair pair = show_all_chars();
+    smove(pair.y, pair.x);
 }
 
 void Screen::show_char(int y, int x) {
@@ -231,10 +232,16 @@ void Screen::show_char(int y, int x) {
     srefresh();
 }
 
-void Screen::show_all_chars() {
+Pair Screen::show_all_chars() {
     // Preserve
     int curx = sgetx();
     int cury = sgety();
+
+    Pair pair;
+    pair.x = -1;
+    pair.y = -1;
+
+    bool final_newline = false;
 
     sclear();
 
@@ -243,14 +250,35 @@ void Screen::show_all_chars() {
             char ch = buffer.get_char(i, j);
             if (ch == 0) {
                 ch = ' ';
+            } else {
+                pair.x = j;
+                pair.y = i;
             }
 
             mvsaddch(i, j, ch);
         }
+
+        if (pair.y == i && buffer.has_new_line(i)) {
+            final_newline = true;
+        } else {
+            final_newline = false;
+        }
+    }
+
+    if (pair.x == -1 && pair.y == -1) {
+        pair.x = 0;
+        pair.y = 0;
+    } else if (!final_newline) {
+        pair.x++;
+    } else {
+        pair.x = 0;
+        pair.y++;
     }
 
     smove(cury, curx);
     srefresh();
+
+    return pair;
 }
 
 // Wrappers
@@ -283,6 +311,10 @@ int Screen::smove(int y, int x) {
         return wmove(window, y, x);
     }
 
+    if (x < 0 || x >= n_cols || y < 0 || y >= n_lines) {
+        return ERR;
+    }
+
     fallback_y = y;
     fallback_x = x;
 
@@ -305,6 +337,10 @@ int Screen::mvsaddch(int y, int x, chtype ch) {
         return mvwaddch(window, y, x, ch);
     }
 
+    if (x < 0 || x >= n_cols || y < 0 || y >= n_lines) {
+        return ERR;
+    }
+
     fallback_x = x;
     fallback_y = y;
 
@@ -315,6 +351,8 @@ int Screen::mvsaddch(int y, int x, chtype ch) {
             fallback_x = 0;
             fallback_y++;
         }
+    } else {
+        return ERR;
     }
 
     return OK;
@@ -332,6 +370,8 @@ int Screen::saddch(chtype ch) {
             fallback_x = 0;
             fallback_y++;
         }
+    } else {
+        return ERR;
     }
 
     return OK;
