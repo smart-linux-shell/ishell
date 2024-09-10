@@ -13,6 +13,7 @@ public:
     int new_line(int terminal_y);
     int clear();
     bool has_new_line(int terminal_y);
+    void push_right(int termianl_y, int terminal_x);
 
 private:
     int terminal_lines, terminal_cols, max_lines;
@@ -34,6 +35,7 @@ private:
     void expand_up();
     bool is_out_of_bounds(int y);
     bool is_out_of_terminal_bounds(int terminal_y, int terminal_x);
+    void push_down(int y);
 };
 
 #endif

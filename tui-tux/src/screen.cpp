@@ -23,8 +23,16 @@ int Screen::get_n_cols() {
 }
 
 void Screen::write_char(char ch) {
+    bool inserting = false;
+
     int curx = sgetx();
     int cury = sgety();
+
+    if (pushing_right > 0) {
+        push_right();
+        pushing_right--;
+        inserting = true;
+    }
 
     if (!cursor_wrapped) {
         buffer.add_char(cury, curx, ch);
@@ -42,7 +50,12 @@ void Screen::write_char(char ch) {
         cursor_wrapped = false;
     }
 
-    show_char(cury, curx);
+    if (inserting) {
+        show_all_chars();
+    } else {
+        show_char(cury, curx);
+    }
+    
     smove(cury, curx + 1);
 }
 
@@ -191,6 +204,18 @@ void Screen::delete_wins() {
     }
 }
 
+// Next num characters will be inserted.
+void Screen::insert_next(int num) {
+    pushing_right = num;
+}
+
+void Screen::push_right() {
+    int cury = sgety();
+    int curx = sgetx();
+
+    buffer.push_right(cury, curx);
+}
+
 void Screen::init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *new_outer, int new_pty_master, int new_pid) {
     n_lines = new_lines;
     n_cols = new_cols;
@@ -199,6 +224,7 @@ void Screen::init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *new_o
     buffer = ScreenRingBuffer(new_lines, new_cols, 1024);
     pty_master = new_pty_master;
     pid = new_pid;
+    pushing_right = 0;
 
     if (window == NULL) {
         fallback_x = 0;

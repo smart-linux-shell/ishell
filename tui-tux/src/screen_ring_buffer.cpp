@@ -74,7 +74,7 @@ void ScreenRingBuffer::scroll_up() {
 }
 
 int ScreenRingBuffer::new_line(int terminal_y) {
-    int y = terminal_begin_line + terminal_y;
+    int y = (terminal_begin_line + terminal_y) % max_lines;
 
     if (is_out_of_terminal_bounds(terminal_y, 0)) {
         return -1;
@@ -115,7 +115,7 @@ int ScreenRingBuffer::clear() {
 }
 
 bool ScreenRingBuffer::has_new_line(int terminal_y) {
-    int y = terminal_begin_line + terminal_y;
+    int y = (terminal_begin_line + terminal_y) % max_lines;
 
     if (is_out_of_terminal_bounds(terminal_y, 0)) {
         return false;
@@ -126,6 +126,73 @@ bool ScreenRingBuffer::has_new_line(int terminal_y) {
     }
 
     return lines[y].new_paragraph;
+}
+
+void ScreenRingBuffer::push_right(int terminal_y, int terminal_x) {
+    if (is_out_of_terminal_bounds(terminal_y, terminal_x)) {
+        return;
+    }
+
+    int y = (terminal_begin_line + terminal_y) % max_lines;
+    int x = terminal_x;
+
+    int orig_x = x;
+    int orig_y = y;
+
+    int target_x = x;
+
+    bool looping = true;
+
+    char begin_char = 0;
+
+    while (looping) {
+        // Start from the end of the line
+        x = terminal_cols - 1;
+
+        char new_begin_char = lines[y].data[x];
+
+        while (x > target_x) {
+            // Push right. If empty spaces are found on the line (that can be used to fill), stop here.
+            if (lines[y].data[x] == 0) {
+                looping = false;
+            }
+
+            lines[y].data[x] = lines[y].data[x - 1];
+
+            x--;
+        }
+
+        if (begin_char != 0) {
+            lines[y].data[target_x] = begin_char;
+        }
+
+        begin_char = new_begin_char;
+        target_x = 0;
+
+        int next_y = (y + 1) % max_lines;
+        
+        if (looping) {
+            // Edge case: if no empty space on this line, but it is the last line in a paragraph.
+            // Create a new line for the remaining chracter, and push all lines down.
+            if (lines[y].new_paragraph) {
+                push_down(next_y);
+                lines[next_y].data[0] = begin_char;
+                lines[next_y].new_paragraph = true;
+                looping = false;
+            } else if (is_out_of_bounds(next_y)) {
+                expand_down();
+                lines[next_y].data[0] = begin_char;
+                looping = false;
+            }
+        }
+
+        y = (y + 1) % max_lines;
+    }
+
+    // Scrolling needed?
+    if (!is_out_of_bounds((terminal_begin_line + terminal_lines) % max_lines)) {
+        scroll_down();
+    }
 }
 
 void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines) {
@@ -274,4 +341,27 @@ bool ScreenRingBuffer::is_out_of_terminal_bounds(int terminal_y, int terminal_x)
     }
 
     return false;
+}
+
+// Push down all lines starting from y.
+void ScreenRingBuffer::push_down(int y) {
+    expand_down();
+
+    int lines_filled_until_y = y - start_line;
+    if (lines_filled_until_y < 0) {
+        lines_filled_until_y += max_lines;
+    }
+
+    int remaining_lines = filled_lines - lines_filled_until_y;
+
+    for (int i = remaining_lines - 1; i >= 1; i--) {
+        // From the end to y
+        int current_y = (y + i) % max_lines;
+        int prev_y = (y + i - 1) % max_lines;
+
+        lines[current_y] = lines[prev_y];
+    }
+
+    lines[y].new_paragraph = false;
+    lines[y].data = new char[terminal_cols];
 }

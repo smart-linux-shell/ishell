@@ -142,7 +142,6 @@ void TerminalMultiplexer::init() {
     screens.push_back(Screen(0, 0, NULL, NULL, pty_assistant_master, assistant_pid));
     screens.push_back(Screen(0, 0, NULL, NULL, pty_bash_master, bash_pid));
 
-    fgetc(stdin);
     init_nc();
 }
 

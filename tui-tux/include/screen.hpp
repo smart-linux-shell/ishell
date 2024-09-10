@@ -36,6 +36,8 @@ public:
     int get_pty_master();
     int get_pid();
     void delete_wins();
+    void insert_next(int num);
+    void push_right();
 
 private:
     int n_lines, n_cols;
@@ -46,6 +48,8 @@ private:
 
     // When window is NULL, use these
     int fallback_y, fallback_x;
+
+    int pushing_right;
 
     WINDOW *window;
     WINDOW *outer;
