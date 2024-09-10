@@ -85,11 +85,16 @@ int ScreenRingBuffer::new_line(int terminal_y) {
         return 0;
     }
 
-    expand_down();
-
     y = y % max_lines;
 
     lines[y].new_paragraph = true;
+
+    int next_line = (y + 1) % max_lines;
+
+    if (is_out_of_bounds(next_line)) {
+        // Expand for newline
+        expand_down();
+    }
 
     return 0;
 }
@@ -135,6 +140,7 @@ void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines
     init(terminal_lines, terminal_cols, max_lines);
 
     int y = max_lines - 1;
+    bool wrote_data = false;
 
     std::string line = "";
 
@@ -145,6 +151,10 @@ void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines
     // Write from the last line up.
     for (int i = old_buffer.filled_lines - 1; i >= 0; i--) {
         int old_y = (old_buffer.start_line + i) % old_buffer.max_lines;
+        int prev_old_y = old_y - 1;
+        if (prev_old_y < 0) {
+            prev_old_y += old_buffer.max_lines;
+        }
 
         // Reconstruct line
 
@@ -154,7 +164,7 @@ void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines
             }
         }
 
-        if (i == 0 || old_buffer.lines[old_y - 1].new_paragraph) {
+        if (i == 0 || old_buffer.lines[prev_old_y].new_paragraph) {
             // Line ends here. Store it and start a new one
             int line_length = line.size();
 
@@ -163,6 +173,12 @@ void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines
 
             if (remaining_cols > 0) {
                 n_wrapped_lines++;
+            }
+
+            if (line_length == 0) {
+                // Empty line
+                y--;
+                wrote_data = true;
             }
 
             for (int k = 0; k < n_wrapped_lines; k++) {
@@ -180,10 +196,12 @@ void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines
                     lines[y].new_paragraph = true;
                 }
 
-                y--;
                 if (y < 0) {
                     break;
                 }
+
+                y--;
+                wrote_data = true;
             }
 
             if (y < 0) {
@@ -195,7 +213,12 @@ void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines
         }
     }
 
-    start_line = y + 1;
+    if (wrote_data) {
+        // Need to offset the last decrementation of y; only if reached.
+        y++;
+    }
+
+    start_line = y;
     filled_lines = max_lines - start_line;
 
     terminal_begin_line = std::max(start_line, max_lines - terminal_lines);

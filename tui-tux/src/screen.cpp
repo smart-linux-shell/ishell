@@ -232,6 +232,7 @@ void Screen::show_char(int y, int x) {
     srefresh();
 }
 
+// Returns where the cursor should be (no more chars after it)
 Pair Screen::show_all_chars() {
     // Preserve
     int curx = sgetx();
@@ -240,8 +241,6 @@ Pair Screen::show_all_chars() {
     Pair pair;
     pair.x = -1;
     pair.y = -1;
-
-    bool final_newline = false;
 
     sclear();
 
@@ -257,22 +256,16 @@ Pair Screen::show_all_chars() {
 
             mvsaddch(i, j, ch);
         }
-
-        if (pair.y == i && buffer.has_new_line(i)) {
-            final_newline = true;
-        } else {
-            final_newline = false;
-        }
     }
 
     if (pair.x == -1 && pair.y == -1) {
         pair.x = 0;
         pair.y = 0;
-    } else if (!final_newline) {
-        pair.x++;
-    } else {
+    } else if (buffer.has_new_line(pair.y)) {
         pair.x = 0;
         pair.y++;
+    } else if (pair.x < n_cols - 1) {
+        pair.x++;
     }
 
     smove(cury, curx);
