@@ -136,9 +136,6 @@ void ScreenRingBuffer::push_right(int terminal_y, int terminal_x) {
     int y = (terminal_begin_line + terminal_y) % max_lines;
     int x = terminal_x;
 
-    int orig_x = x;
-    int orig_y = y;
-
     int target_x = x;
 
     bool looping = true;
