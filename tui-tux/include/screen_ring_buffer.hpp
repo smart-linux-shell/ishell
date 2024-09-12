@@ -1,6 +1,8 @@
 #ifndef ISHELL_SCREEN_RING_BUFFER
 #define ISHELL_SCREEN_RING_BUFFER
 
+#include <vector>
+
 class ScreenRingBuffer {
 public:
     ScreenRingBuffer();
@@ -23,11 +25,11 @@ private:
     int terminal_begin_line;
 
     struct Line {
-        char *data;
+        std::vector<char> data;
         bool new_paragraph;   
     };
 
-    Line *lines;
+    std::vector<Line> lines;
     
     void init(int terminal_lines, int terminal_cols, int max_lines);
     void init(int terminal_lines, int terminal_cols, int max_lines, ScreenRingBuffer &old_buffer);

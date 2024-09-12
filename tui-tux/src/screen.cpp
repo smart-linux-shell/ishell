@@ -225,6 +225,7 @@ void Screen::init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *new_o
     pty_master = new_pty_master;
     pid = new_pid;
     pushing_right = 0;
+    displayed_scroller_screen = NULL;
 
     if (window == NULL) {
         fallback_x = 0;

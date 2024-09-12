@@ -138,6 +138,8 @@ void TerminalMultiplexer::init() {
         exit(EXIT_FAILURE);
     }
 
+    fgetc(stdin);
+
     // Create temporary unsized screens
     screens.push_back(Screen(0, 0, NULL, NULL, pty_assistant_master, assistant_pid));
     screens.push_back(Screen(0, 0, NULL, NULL, pty_bash_master, bash_pid));
