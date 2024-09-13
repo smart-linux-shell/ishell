@@ -14,6 +14,10 @@ Screen::Screen(int lines, int cols, WINDOW *window, WINDOW *outer, Screen &old_s
     init(lines, cols, window, outer, old_screen);
 }
 
+Screen::~Screen() {
+    cleanup();
+}
+
 int Screen::get_n_lines() {
     return n_lines;
 }
@@ -216,6 +220,16 @@ void Screen::push_right() {
     buffer.push_right(cury, curx);
 }
 
+void Screen::set_displayed_scroller_screen(Screen &scroller_screen) {
+    if (displayed_scroller_screen != NULL) {
+        delete displayed_scroller_screen;
+        displayed_scroller_screen = NULL;
+    }
+
+    displayed_scroller_screen = new Screen;
+    *displayed_scroller_screen = scroller_screen;
+}
+
 void Screen::init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *new_outer, int new_pty_master, int new_pid) {
     n_lines = new_lines;
     n_cols = new_cols;
@@ -299,6 +313,13 @@ std::pair<int, int> Screen::show_all_chars() {
     srefresh();
 
     return pair;
+}
+
+void Screen::cleanup() {
+    if (displayed_scroller_screen != NULL) {
+        delete displayed_scroller_screen;
+        displayed_scroller_screen = NULL;
+    }
 }
 
 // Wrappers

@@ -11,6 +11,7 @@ public:
     Screen();
     Screen(int lines, int cols, WINDOW *window, WINDOW *outer, int pty_master, int pid);
     Screen(int lines, int cols, WINDOW *window, WINDOW *outer, Screen &old_screen);
+    ~Screen();
     int get_n_lines();
     int get_n_cols();
     void write_char(char ch);
@@ -35,6 +36,7 @@ public:
     void delete_wins();
     void insert_next(int num);
     void push_right();
+    void set_displayed_scroller_screen(Screen &scroller_screen);
 
 private:
     int n_lines, n_cols;

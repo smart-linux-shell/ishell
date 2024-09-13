@@ -543,6 +543,8 @@ int TerminalMultiplexer::handle_input() {
                 } else {
                     zoom_out();
                 }
+            } else if (ch == '[') {
+                
             }
         } else if (focus != FOCUS_NULL) {
             handle_pty_input(screens[focus].get_pty_master(), ch);
