@@ -1,7 +1,7 @@
 #include <string>
 #include <string.h>
 
-#include "screen_ring_buffer.hpp"
+#include "../include/screen_ring_buffer.hpp"
 
 ScreenRingBuffer::ScreenRingBuffer() {}
 
@@ -74,7 +74,7 @@ void ScreenRingBuffer::scroll_up() {
 }
 
 int ScreenRingBuffer::new_line(int terminal_y) {
-    int y = terminal_begin_line + terminal_y;
+    int y = (terminal_begin_line + terminal_y) % max_lines;
 
     if (is_out_of_terminal_bounds(terminal_y, 0)) {
         return -1;
@@ -89,12 +89,19 @@ int ScreenRingBuffer::new_line(int terminal_y) {
 
     lines[y].new_paragraph = true;
 
+    int next_line = (y + 1) % max_lines;
+
+    if (is_out_of_bounds(next_line)) {
+        // Expand for newline
+        expand_down();
+    }
+
     return 0;
 }
 
 int ScreenRingBuffer::clear() {
     start_line = 0;
-    filled_lines = 1;
+    filled_lines = 0;
     terminal_begin_line = 0;
 
     lines = new Line[max_lines];
@@ -105,6 +112,84 @@ int ScreenRingBuffer::clear() {
     }
 
     return 0;
+}
+
+bool ScreenRingBuffer::has_new_line(int terminal_y) {
+    int y = (terminal_begin_line + terminal_y) % max_lines;
+
+    if (is_out_of_terminal_bounds(terminal_y, 0)) {
+        return false;
+    }
+
+    if (is_out_of_bounds(y)) {
+        return false;
+    }
+
+    return lines[y].new_paragraph;
+}
+
+void ScreenRingBuffer::push_right(int terminal_y, int terminal_x) {
+    if (is_out_of_terminal_bounds(terminal_y, terminal_x)) {
+        return;
+    }
+
+    int y = (terminal_begin_line + terminal_y) % max_lines;
+    int x = terminal_x;
+
+    int target_x = x;
+
+    bool looping = true;
+
+    char begin_char = 0;
+
+    while (looping) {
+        // Start from the end of the line
+        x = terminal_cols - 1;
+
+        char new_begin_char = lines[y].data[x];
+
+        while (x > target_x) {
+            // Push right. If empty spaces are found on the line (that can be used to fill), stop here.
+            if (lines[y].data[x] == 0) {
+                looping = false;
+            }
+
+            lines[y].data[x] = lines[y].data[x - 1];
+
+            x--;
+        }
+
+        if (begin_char != 0) {
+            lines[y].data[target_x] = begin_char;
+        }
+
+        begin_char = new_begin_char;
+        target_x = 0;
+
+        int next_y = (y + 1) % max_lines;
+        
+        if (looping) {
+            // Edge case: if no empty space on this line, but it is the last line in a paragraph.
+            // Create a new line for the remaining chracter, and push all lines down.
+            if (lines[y].new_paragraph) {
+                push_down(next_y);
+                lines[next_y].data[0] = begin_char;
+                lines[next_y].new_paragraph = true;
+                looping = false;
+            } else if (is_out_of_bounds(next_y)) {
+                expand_down();
+                lines[next_y].data[0] = begin_char;
+                looping = false;
+            }
+        }
+
+        y = (y + 1) % max_lines;
+    }
+
+    // Scrolling needed?
+    if (!is_out_of_bounds((terminal_begin_line + terminal_lines) % max_lines)) {
+        scroll_down();
+    }
 }
 
 void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines) {
@@ -119,14 +204,21 @@ void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines
     init(terminal_lines, terminal_cols, max_lines);
 
     int y = max_lines - 1;
+    bool wrote_data = false;
 
     std::string line = "";
 
     bool last_line = true;
 
+    // Resizing old buffer to current buffer
+
     // Write from the last line up.
     for (int i = old_buffer.filled_lines - 1; i >= 0; i--) {
         int old_y = (old_buffer.start_line + i) % old_buffer.max_lines;
+        int prev_old_y = old_y - 1;
+        if (prev_old_y < 0) {
+            prev_old_y += old_buffer.max_lines;
+        }
 
         // Reconstruct line
 
@@ -136,7 +228,7 @@ void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines
             }
         }
 
-        if (i == 0 || old_buffer.lines[old_y - 1].new_paragraph) {
+        if (i == 0 || old_buffer.lines[prev_old_y].new_paragraph) {
             // Line ends here. Store it and start a new one
             int line_length = line.size();
 
@@ -145,6 +237,12 @@ void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines
 
             if (remaining_cols > 0) {
                 n_wrapped_lines++;
+            }
+
+            if (line_length == 0) {
+                // Empty line
+                y--;
+                wrote_data = true;
             }
 
             for (int k = 0; k < n_wrapped_lines; k++) {
@@ -162,10 +260,12 @@ void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines
                     lines[y].new_paragraph = true;
                 }
 
-                y--;
                 if (y < 0) {
                     break;
                 }
+
+                y--;
+                wrote_data = true;
             }
 
             if (y < 0) {
@@ -177,10 +277,15 @@ void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines
         }
     }
 
-    start_line = y + 1;
+    if (wrote_data) {
+        // Need to offset the last decrementation of y; only if reached.
+        y++;
+    }
+
+    start_line = y;
     filled_lines = max_lines - start_line;
 
-    terminal_begin_line = std::max(start_line, max_lines - terminal_lines - 1);
+    terminal_begin_line = std::max(start_line, max_lines - terminal_lines);
 }
 
 void ScreenRingBuffer::expand_down() {
@@ -233,4 +338,27 @@ bool ScreenRingBuffer::is_out_of_terminal_bounds(int terminal_y, int terminal_x)
     }
 
     return false;
+}
+
+// Push down all lines starting from y.
+void ScreenRingBuffer::push_down(int y) {
+    expand_down();
+
+    int lines_filled_until_y = y - start_line;
+    if (lines_filled_until_y < 0) {
+        lines_filled_until_y += max_lines;
+    }
+
+    int remaining_lines = filled_lines - lines_filled_until_y;
+
+    for (int i = remaining_lines - 1; i >= 1; i--) {
+        // From the end to y
+        int current_y = (y + i) % max_lines;
+        int prev_y = (y + i - 1) % max_lines;
+
+        lines[current_y] = lines[prev_y];
+    }
+
+    lines[y].new_paragraph = false;
+    lines[y].data = new char[terminal_cols];
 }
