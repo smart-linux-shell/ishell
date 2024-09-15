@@ -26,6 +26,7 @@ std::string execute_query(const std::string &query) {
     return result;
 }
 
+
 // TODO cleanup
 void load_bookmarks(const std::string &filename) {
     std::ifstream file(filename);
@@ -64,6 +65,26 @@ void save_bookmarks(const std::string &filename) {
     file.close();
 }
 
+bool is_bookmarking(const std::string &input_str) {
+    return input_str.find("bookmark") == 0;
+}
+
+bool is_bookmark_flag(const std::string &option) {
+    return (option == "-b" || option == "--bookmark");
+}
+
+bool is_bookmark(const std::string &alias) {
+    return bookmarks.find(alias) != bookmarks.end();
+}
+
+std::pair<std::string, std::string> get_bookmark(const std::string &alias) {
+    return bookmarks[alias];
+}
+
+bool is_list_flag(const std::string &input) {
+    return (input == "bookmark -l" || input == "bookmark --list");
+}
+
 // TODO change outputs - this is just for testing purposes
 void bookmark(int index, const std::string &alias) {
     if (index > 0 && index <= history_length) {
@@ -90,10 +111,28 @@ void bookmark(int index, const std::string &alias) {
     }
 }
 
+void list_bookmarks() {
+    if (bookmarks.empty()) {
+        std::cout << "No bookmarks available.\n";
+        return;
+    }
+
+    std::cout << "Bookmarks:\n";
+        std::cout << "BOOKMARK" << "\t\t" << "QUERY" << "\n";
+    for (const auto &entry : bookmarks) {
+        std::cout << entry.first << "\t\t" << entry.second.first << "\n";
+    }
+}
+
 void handle_bookmark_command(const std::string &input_str) {
     std::istringstream iss(input_str);
     std::string cmd, alias;
     int index = 1;
+
+    if (is_list_flag(input_str)) {
+        list_bookmarks();
+        return;
+    }
 
     // try parsing for "bookmark <index> <alias>"
     if (!(iss >> cmd >> index >> alias)) {
@@ -107,21 +146,7 @@ void handle_bookmark_command(const std::string &input_str) {
     bookmark(index, alias);
 }
 
-bool is_bookmarking(const std::string &input_str) {
-    return input_str.find("bookmark") == 0;
-}
 
-bool is_bookmark_flag(const std::string &option) {
-    return (option == "-b" || option == "--bookmark");
-}
-
-bool is_bookmark(const std::string &alias) {
-    return bookmarks.find(alias) != bookmarks.end();
-}
-
-std::pair<std::string, std::string> get_bookmark(const std::string &alias) {
-    return bookmarks[alias];
-}
 
 void assistant() {
     using_history();
