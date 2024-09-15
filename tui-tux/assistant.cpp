@@ -3,19 +3,56 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <fstream>
+#include <sstream>
 #include <iostream>
+
 #include <unordered_map>
 #include <string>
 #include <vector>
-#include <sstream>
+#include <utility>
+#include <algorithm>
 
 #include "agency_request_wrapper.hpp"
 
 // <alias:<command, result>>
 std::unordered_map<std::string, std::pair<std::string, std::string>> bookmarks;
+// <command, result>
+std::vector<std::pair<std::string, std::string>> session_history;
+
+void load_bookmarks(const std::string &filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Error opening file: " << filename << "\n";
+        return;
+    }
+    std::string line, alias, command, result;
+    std::getline(file, line); // skip the header
+    while (std::getline(file, line)) {
+        std::istringstream iss(line);
+        if (std::getline(iss, alias, ',') && std::getline(iss, command, ',') && std::getline(iss, result)) {
+            bookmarks[alias] = {command, result};
+        }
+    }
+    file.close();
+}
+
+void save_bookmarks(const std::string &filename) {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Error opening file: " << filename << "\n";
+        return;
+    }
+    file << "alias,command,result\n";
+    for (const auto &entry : bookmarks) {
+        file << entry.first << "," << entry.second.first << "," << entry.second.second << "\n";
+    }
+    file.close();
+}
 
 void assistant() {
     using_history();
+    load_bookmarks("bookmarks.csv"); // load bookmarks
 
     while (1) {
         char *input = readline("assistant> ");
@@ -61,4 +98,5 @@ void assistant() {
 
         free(input);
     }
+    save_bookmarks("bookmarks.csv"); // save bookmarks on exit
 }
