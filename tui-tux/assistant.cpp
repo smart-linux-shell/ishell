@@ -26,14 +26,22 @@ std::string execute_query(const std::string &command) {
     return result;
 }
 
+// TODO cleanup
 void load_bookmarks(const std::string &filename) {
     std::ifstream file(filename);
     if (!file.is_open()) {
-        std::cerr << "Error opening file: " << filename << "\n";
+        // create if not existing
+        std::ofstream create_file(filename);
+        if (!create_file.is_open()) {
+            std::cerr << "Error creating file: " << filename << "\n";
+            return;
+        }
+        create_file << "alias,command,result\n";  // Add the header
+        create_file.close();
         return;
     }
     std::string line, alias, command, result;
-    std::getline(file, line); // skip the header
+    std::getline(file, line);  // skip the header
     while (std::getline(file, line)) {
         std::istringstream iss(line);
         if (std::getline(iss, alias, ',') && std::getline(iss, command, ',') && std::getline(iss, result)) {
@@ -85,17 +93,17 @@ void bookmark(int index, const std::string &alias) {
 void handle_bookmark_command(const std::string &input_str) {
     std::istringstream iss(input_str);
     std::string cmd, alias;
-    int index = 1;  // Default index to 1 for "bookmark <alias>" case
+    int index = 1;
 
     // try parsing for "bookmark <index> <alias>"
-    iss >> cmd >> index >> alias;
-
-    if (iss.fail()) {
-        // case where the input is just "bookmark <alias>" -> bookmark last command
+    if (!(iss >> cmd >> index >> alias)) {
+        // if parsing fails, it means the input is in the form "bookmark <alias>"
         iss.clear();
         iss.str(input_str);
         iss >> cmd >> alias;
-	}
+        index = 1;
+    }
+
     bookmark(index, alias);
 }
 
@@ -153,3 +161,4 @@ void assistant() {
 }
 
 // TODO check the same alias
+// TODO move bookmarks logic to another script
