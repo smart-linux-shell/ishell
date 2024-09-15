@@ -82,7 +82,6 @@ void bookmark(int index, const std::string &alias) {
     }
 }
 
-
 void handle_bookmark_command(const std::string &input_str) {
     std::istringstream iss(input_str);
     std::string cmd, alias;
@@ -92,7 +91,7 @@ void handle_bookmark_command(const std::string &input_str) {
     iss >> cmd >> index >> alias;
 
     if (iss.fail()) {
-        // case where the input is just "bookmark <alias>" -- bookmark last command
+        // case where the input is just "bookmark <alias>" -> bookmark last command
         iss.clear();
         iss.str(input_str);
         iss >> cmd >> alias;
@@ -102,6 +101,18 @@ void handle_bookmark_command(const std::string &input_str) {
 
 bool is_bookmarking(const std::string &input_str) {
     return input_str.find("bookmark") == 0;
+}
+
+bool is_bookmark_flag(const std::string &option) {
+    return (option == "-b" || option == "--bookmark");
+}
+
+bool is_bookmark(const std::string &alias) {
+    return bookmarks.find(alias) != bookmarks.end();
+}
+
+std::pair<std::string, std::string> get_bookmark(const std::string &alias) {
+    return bookmarks[alias];
 }
 
 void assistant() {
@@ -121,17 +132,24 @@ void assistant() {
             handle_bookmark_command(input_str);
         }
 		// TODO change outputs - this is just for testing purposes
-        else if (bookmarks.find(input_str) != bookmarks.end()) {
-            std::string command = bookmarks[input_str].first;
-            std::string result = bookmarks[input_str].second;
-            std::cout << "Executing bookmarked command \"" << command << "\" with result: " << result << "\n";
-        }
         else {
-            add_history(input);
-			std::string result = execute_query(input);
-            std::cout << result << "\n";
-        }
+   	 		// check if input is in the form "<alias> -b" or "<alias> --bookmark"
+    		std::istringstream iss(input_str);
+    		std::string alias, option;
+    		iss >> alias >> option;
+
+   			if (is_bookmark_flag(option) && is_bookmark(alias)) {
+            	auto [command, result] = get_bookmark(alias);
+            	std::cout << "Executing bookmarked command \"" << command << "\" with result: " << result << "\n";
+        	}  else {
+     		   	add_history(input);
+     			std::string result = execute_query(input_str);
+     			std::cout << result << "\n";
+    		}
+		}
         free(input);
     }
     save_bookmarks("bookmarks.csv"); // save bookmarks on exit
 }
+
+// TODO check the same alias
