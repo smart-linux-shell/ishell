@@ -15,14 +15,14 @@
 
 #include "agency_request_wrapper.hpp"
 
-// <alias:<command, result>>
+// <alias:<query, result>>
 std::unordered_map<std::string, std::pair<std::string, std::string>> bookmarks;
-// <command, result>
+// <query, result>
 std::vector<std::pair<std::string, std::string>> session_history;
 
-std::string execute_query(const std::string &command) {
-    std::string result = ask_agent("http://127.0.0.1:5000/agents/assistant", command);
-    session_history.push_back({command, result});
+std::string execute_query(const std::string &query) {
+    std::string result = ask_agent("http://127.0.0.1:5000/agents/assistant", query);
+    session_history.push_back({query, result});
     return result;
 }
 
@@ -36,16 +36,16 @@ void load_bookmarks(const std::string &filename) {
             std::cerr << "Error creating file: " << filename << "\n";
             return;
         }
-        create_file << "alias,command,result\n";  // Add the header
+        create_file << "alias,query,result\n";  // Add the header
         create_file.close();
         return;
     }
-    std::string line, alias, command, result;
+    std::string line, alias, query, result;
     std::getline(file, line);  // skip the header
     while (std::getline(file, line)) {
         std::istringstream iss(line);
-        if (std::getline(iss, alias, ',') && std::getline(iss, command, ',') && std::getline(iss, result)) {
-            bookmarks[alias] = {command, result};
+        if (std::getline(iss, alias, ',') && std::getline(iss, query, ',') && std::getline(iss, result)) {
+            bookmarks[alias] = {query, result};
         }
     }
     file.close();
@@ -57,7 +57,7 @@ void save_bookmarks(const std::string &filename) {
         std::cerr << "Error opening file: " << filename << "\n";
         return;
     }
-    file << "alias,command,result\n";
+    file << "alias,query,result\n";
     for (const auto &entry : bookmarks) {
         file << entry.first << "," << entry.second.first << "," << entry.second.second << "\n";
     }
@@ -69,21 +69,21 @@ void bookmark(int index, const std::string &alias) {
     if (index > 0 && index <= history_length) {
         HIST_ENTRY *he = history_get(history_length - index + 1);
         if (he) {
-            std::string command(he->line);
+            std::string query(he->line);
             std::string result;
 
             auto it = std::find_if(session_history.begin(), session_history.end(),
-                                   [&command](const std::pair<std::string, std::string> &entry) {
-                                       return entry.first == command;
+                                   [&query](const std::pair<std::string, std::string> &entry) {
+                                       return entry.first == query;
                                    });
 
             if (it != session_history.end()) {
                 result = it->second;
             } else {
-				std::string result = execute_query(command);
+				std::string result = execute_query(query);
             }
-            bookmarks[alias] = {command, result};
-            std::cout << "Bookmarked command: \"" << command << "\" with alias: \"" << alias << "\"\n";
+            bookmarks[alias] = {query, result};
+            std::cout << "Bookmarked query: \"" << query << "\" with alias: \"" << alias << "\"\n";
         }
     } else {
         std::cout << "Invalid history index.\n";
@@ -147,8 +147,8 @@ void assistant() {
     		iss >> alias >> option;
 
    			if (is_bookmark_flag(option) && is_bookmark(alias)) {
-            	auto [command, result] = get_bookmark(alias);
-            	std::cout << "Executing bookmarked command \"" << command << "\" with result: " << result << "\n";
+            	auto [query, result] = get_bookmark(alias);
+            	std::cout << "Executing bookmarked query \"" << query << "\" with result: " << result << "\n";
         	}  else {
      		   	add_history(input);
      			std::string result = execute_query(input_str);
