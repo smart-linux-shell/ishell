@@ -1,5 +1,5 @@
 TARGET := main
-SOURCES := screen_ring_buffer.cpp screen.cpp escape.cpp assistant.cpp terminal_multiplexer.cpp main.cpp agency_request_wrapper.cpp ../https-client/https_client.cpp
+SOURCES := screen_ring_buffer.cpp screen.cpp escape.cpp assistant.cpp assistant_query.cpp bookmarks.cpp terminal_multiplexer.cpp main.cpp agency_request_wrapper.cpp ../https-client/https_client.cpp
 OBJECTS := $(patsubst %.cpp,%.o,$(SOURCES))
 
 INCLUDE := -I.
