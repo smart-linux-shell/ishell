@@ -148,6 +148,19 @@ void list_bookmarks() {
     }
 }
 
+void help() {
+    std::ifstream file("manuals/bookmark.txt");
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not find the documentation.\n";
+        return;
+    }
+    std::string line;
+    while (std::getline(file, line)) {
+        std::cout << line << "\n";
+    }
+    file.close();
+}
+
 bool try_parse_bookmark_command(const std::string &input_str, std::string &cmd, int &index, std::string &alias) {
     std::istringstream iss(input_str);
     // try to parse "bookmark <index> <alias>"
@@ -170,6 +183,10 @@ void handle_bookmark_command(const std::string &input_str, std::vector<std::pair
         list_bookmarks();
         return;
     }
+    else if (is_help_flag(input_str)) {
+        help();
+        return;
+    }
 
     std::string cmd;
     int index;
@@ -178,5 +195,6 @@ void handle_bookmark_command(const std::string &input_str, std::vector<std::pair
         bookmark(index, alias, session_history);
     } else {
         std::cerr << "Invalid bookmark command format.\n";
+        help();
     }
 }
