@@ -24,18 +24,19 @@ void assistant() {
 
         std::string input_str(input);
 
-        if (is_bookmarking(input_str)) {
+        if (is_bookmark_command(input_str)) {
             handle_bookmark_command(input_str, session_history);
         } else {
             std::istringstream iss(input_str);
             std::string alias, option;
             iss >> alias >> option;
-
             if (is_bookmark_flag(option) && is_bookmark(alias)) {
+				// use bookmarked
                 auto [query, result] = get_bookmark(alias);
                 session_history.push_back({query, result});
                 std::cout << result << "\n";
             } else {
+    			// new query to assistant
                 add_history(input);
                 std::string result = execute_query(input_str, session_history);
                 std::cout << result << "\n";
