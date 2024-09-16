@@ -102,6 +102,12 @@ std::string find_result_in_session_history(const std::string &query, std::vector
 }
 
 void bookmark(int index, const std::string &alias, std::vector<std::pair<std::string, std::string>> &session_history) {
+    // bookmark already exists
+    if (bookmarks.find(alias) != bookmarks.end()) {
+        std::cout << "Error: Bookmark '" << alias << "' already exists.\n";
+        return;
+    }
+
     // find query
     std::string query = get_query_from_history(index);
     if (query.empty()) {
@@ -115,6 +121,7 @@ void bookmark(int index, const std::string &alias, std::vector<std::pair<std::st
     }
     // bookmark
     bookmarks[alias] = {query, result};
+    std::cout << "Saved the query under the bookmark '" << alias  << "'" << "\n";
 }
 
 void list_bookmarks() {
@@ -124,21 +131,36 @@ void list_bookmarks() {
     }
 }
 
-void handle_bookmark_command(const std::string &input_str, std::vector<std::pair<std::string, std::string>> &session_history) {
+
+bool try_parse_bookmark_command(const std::string &input_str, std::string &cmd, int &index, std::string &alias) {
     std::istringstream iss(input_str);
-    std::string cmd, alias;
-    int index = 1;
-    // list bookmarks command
+    // try to parse "bookmark <index> <alias>"
+    if (iss >> cmd >> index >> alias) {
+        return true;
+    }
+    // if parsing fails, try to parse "bookmark <alias>"
+    iss.clear();
+    iss.str(input_str);
+    if (iss >> cmd >> alias) {
+        index = 1; // default index if not provided
+        return true;
+    }
+    return false;
+}
+
+
+void handle_bookmark_command(const std::string &input_str, std::vector<std::pair<std::string, std::string>> &session_history) {
     if (is_list_flag(input_str)) {
         list_bookmarks();
         return;
     }
-    // bookmark
-    if (!(iss >> cmd >> index >> alias)) {
-        iss.clear();
-        iss.str(input_str);
-        iss >> cmd >> alias;
-        index = 1;
+
+    std::string cmd;
+    int index;
+    std::string alias;
+    if (try_parse_bookmark_command(input_str, cmd, index, alias)) {
+        bookmark(index, alias, session_history);
+    } else {
+        std::cerr << "Invalid bookmark command format.\n";
     }
-    bookmark(index, alias, session_history);
 }
