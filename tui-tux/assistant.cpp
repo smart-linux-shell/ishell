@@ -35,6 +35,9 @@ void assistant() {
                 auto [query, result] = get_bookmark(alias);
                 session_history.push_back({query, result});
                 std::cout << result << "\n";
+            } else if (is_remove_flag(option)) {
+				// remove bookmark
+                remove_bookmark(alias);
             } else {
     			// new query to assistant
                 add_history(input);

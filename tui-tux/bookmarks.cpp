@@ -23,7 +23,10 @@ bool create_bookmarks_file(const std::string &filename) {
 void parse_bookmark_line(const std::string &line) {
     std::istringstream iss(line);
     std::string alias, query, result;
-    if (std::getline(iss, alias, ',') && std::getline(iss, query, ',') && std::getline(iss, result)) {
+    if (std::getline(iss, alias, ',') && std::getline(iss, query, ',')) {
+        if (!std::getline(iss, result)) {
+            result = "";
+        }
         bookmarks[alias] = {query, result};
     }
 }
@@ -62,6 +65,10 @@ bool is_bookmark_command(const std::string &input_str) {
 
 bool is_bookmark_flag(const std::string &option) {
     return (option == "-b" || option == "--bookmark");
+}
+
+bool is_remove_flag(const std::string &option) {
+    return (option == "-r" || option == "--remove");
 }
 
 bool is_bookmark(const std::string &alias) {
@@ -124,13 +131,22 @@ void bookmark(int index, const std::string &alias, std::vector<std::pair<std::st
     std::cout << "Saved the query under the bookmark '" << alias  << "'" << "\n";
 }
 
+void remove_bookmark(const std::string &alias) {
+    std::unordered_map<std::string, std::pair<std::string, std::string>>::iterator it = bookmarks.find(alias);
+    if (it != bookmarks.end()) {
+        bookmarks.erase(it);
+        std::cout << "Removed bookmark '" << alias << "'.\n";
+    } else {
+        std::cout << "Error: Bookmark '" << alias << "' not found.\n";
+    }
+}
+
 void list_bookmarks() {
     std::cout << "BOOKMARK" << "\t\t" << "QUERY" << "\n";
     for (std::unordered_map<std::string, std::pair<std::string, std::string>>::const_iterator it = bookmarks.begin(); it != bookmarks.end(); ++it) {
         std::cout << it->first << "\t\t\t" << it->second.first << "\n";
     }
 }
-
 
 bool try_parse_bookmark_command(const std::string &input_str, std::string &cmd, int &index, std::string &alias) {
     std::istringstream iss(input_str);
