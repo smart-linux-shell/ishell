@@ -182,15 +182,15 @@ void Screen::newline() {
     srefresh();
 }
 
-WINDOW *Screen::get_window() {
+const WINDOW *Screen::get_window() {
     return window;
 }
 
-int Screen::get_pty_master() {
+const int Screen::get_pty_master() {
     return pty_master;
 }
 
-int Screen::get_pid() {
+const int Screen::get_pid() {
     return pid;
 }
 
@@ -238,8 +238,8 @@ void Screen::init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *new_o
     buffer = ScreenRingBuffer(new_lines, new_cols, 1024, old_screen.buffer);
 
     // Draw text
-    Pair pair = show_all_chars();
-    smove(pair.y, pair.x);
+    std::pair<int, int> pair = show_all_chars();
+    smove(pair.second, pair.first);
 }
 
 void Screen::show_char(int y, int x) {
@@ -259,14 +259,14 @@ void Screen::show_char(int y, int x) {
 }
 
 // Returns where the cursor should be (no more chars after it)
-Pair Screen::show_all_chars() {
+std::pair<int, int> Screen::show_all_chars() {
     // Preserve
     int curx = sgetx();
     int cury = sgety();
 
-    Pair pair;
-    pair.x = -1;
-    pair.y = -1;
+    std::pair<int, int> pair;
+    pair.first = -1;
+    pair.second = -1;
 
     sclear();
 
@@ -276,22 +276,22 @@ Pair Screen::show_all_chars() {
             if (ch == 0) {
                 ch = ' ';
             } else {
-                pair.x = j;
-                pair.y = i;
+                pair.first = j;
+                pair.second = i;
             }
 
             mvsaddch(i, j, ch);
         }
     }
 
-    if (pair.x == -1 && pair.y == -1) {
-        pair.x = 0;
-        pair.y = 0;
-    } else if (buffer.has_new_line(pair.y)) {
-        pair.x = 0;
-        pair.y++;
-    } else if (pair.x < n_cols - 1) {
-        pair.x++;
+    if (pair.first == -1 && pair.second == -1) {
+        pair.first = 0;
+        pair.second = 0;
+    } else if (buffer.has_new_line(pair.second)) {
+        pair.first = 0;
+        pair.second++;
+    } else if (pair.first < n_cols - 1) {
+        pair.first++;
     }
 
     smove(cury, curx);

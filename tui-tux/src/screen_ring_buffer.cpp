@@ -31,7 +31,7 @@ int ScreenRingBuffer::add_char(int terminal_y, int terminal_x, char ch) {
     return 0;
 }
 
-char ScreenRingBuffer::get_char(int terminal_y, int terminal_x) {
+const char ScreenRingBuffer::get_char(int terminal_y, int terminal_x) {
     int y = (terminal_begin_line + terminal_y) % max_lines;
     int x = terminal_x;
 

@@ -2,12 +2,9 @@
 #define ISHELL_SCREEN
 
 #include <ncurses.h>
+#include <utility>
 
 #include "screen_ring_buffer.hpp"
-
-struct Pair {
-    int x, y;
-};
 
 class Screen {
 public:
@@ -32,9 +29,9 @@ public:
     void scroll_down();
     void scroll_up();
     void newline();
-    WINDOW *get_window();
-    int get_pty_master();
-    int get_pid();
+    const WINDOW *get_window();
+    const int get_pty_master();
+    const int get_pid();
     void delete_wins();
     void insert_next(int num);
     void push_right();
@@ -59,7 +56,7 @@ private:
     void init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *outer, int new_pty_master, int new_pid);
     void init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *outer, Screen &old_screen);
     void show_char(int y, int x);
-    Pair show_all_chars();
+    std::pair<int, int> show_all_chars();
 
 public:
     // Wrappers

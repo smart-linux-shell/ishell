@@ -7,7 +7,7 @@ public:
     ScreenRingBuffer(int terminal_lines, int terminal_cols, int max_lines);
     ScreenRingBuffer(int terminal_lines, int terminal_cols, int max_lines, ScreenRingBuffer &old_buffer);
     int add_char(int terminal_y, int terminal_x, char ch);
-    char get_char(int terminal_y, int terminal_x);
+    const char get_char(int terminal_y, int terminal_x);
     void scroll_down();
     void scroll_up();
     int new_line(int terminal_y);
