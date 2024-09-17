@@ -1,0 +1,23 @@
+name: ishell
+version: '0.0.1'
+base: core22
+confinement: strict
+summary: Example summary
+description: |
+  Example description
+  
+parts:
+  ishell:
+    source: .
+    plugin: make
+    build-packages:
+      - libreadline-dev
+      - libncurses-dev
+      - libcurl4-openssl-dev
+    stage-packages:
+      - libreadline8
+      - libncurses6
+      - libcurl4
+apps:
+  ishell:
+    command: /usr/bin/ishell

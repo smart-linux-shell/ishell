@@ -7,11 +7,13 @@ public:
     ScreenRingBuffer(int terminal_lines, int terminal_cols, int max_lines);
     ScreenRingBuffer(int terminal_lines, int terminal_cols, int max_lines, ScreenRingBuffer &old_buffer);
     int add_char(int terminal_y, int terminal_x, char ch);
-    char get_char(int terminal_y, int terminal_x);
+    const char get_char(int terminal_y, int terminal_x);
     void scroll_down();
     void scroll_up();
     int new_line(int terminal_y);
     int clear();
+    bool has_new_line(int terminal_y);
+    void push_right(int termianl_y, int terminal_x);
 
 private:
     int terminal_lines, terminal_cols, max_lines;
@@ -33,6 +35,7 @@ private:
     void expand_up();
     bool is_out_of_bounds(int y);
     bool is_out_of_terminal_bounds(int terminal_y, int terminal_x);
+    void push_down(int y);
 };
 
 #endif

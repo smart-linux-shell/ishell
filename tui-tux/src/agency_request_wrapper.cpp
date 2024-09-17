@@ -5,7 +5,9 @@
 #include <string>
 #include <iostream>
 #include "../nlohmann/json.hpp"
-#include "../https-client/https_client.hpp"
+#include "../include/https_client.hpp"
+
+#define INSTALLED_PACKAGES_BUFSIZ 128
 
 using json = nlohmann::json;
 
@@ -25,7 +27,7 @@ std::vector<std::string> get_installed_packages() {
     if (!pipe) {
         return packages;
     }
-    char buffer[128];
+    char buffer[INSTALLED_PACKAGES_BUFSIZ];
     while (fgets(buffer, 128, pipe) != nullptr) {
         packages.push_back(buffer);
     }

@@ -1,19 +1,23 @@
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <stdio.h>
+#include <stdlib.h>
+
 #include <iostream>
-#include <fstream>
-#include <sstream>
-#include <iostream>
-#include "bookmarks.hpp"
-#include "bookmarks.hpp"
-#include "assistant_query.hpp"
+#include <algorithm>
+
+#include "../include/assistant_query.hpp"
+#include "../include/bookmarks.hpp"
+#include "../include/agency_request_wrapper.hpp"
+
 
 // <query, result>
 std::vector<std::pair<std::string, std::string>> session_history;
 
 void assistant() {
     using_history();
-    load_bookmarks("bookmarks.csv");
+    get_agency_url();
+    load_bookmarks("local/bookmarks.csv");
 
     while (1) {
         char *input = readline("assistant> ");
@@ -31,15 +35,15 @@ void assistant() {
             std::string alias, option;
             iss >> alias >> option;
             if (is_bookmark_flag(option) && is_bookmark(alias)) {
-				// use bookmarked
+                // use bookmarked
                 auto [query, result] = get_bookmark(alias);
                 session_history.push_back({query, result});
                 std::cout << result << "\n";
             } else if (is_remove_flag(option)) {
-				// remove bookmark
+                // remove bookmark
                 remove_bookmark(alias);
             } else {
-    			// new query to assistant
+                // new query to assistant
                 add_history(input);
                 std::string result = execute_query(input_str, session_history);
                 std::cout << result << "\n";
@@ -48,5 +52,5 @@ void assistant() {
         free(input);
     }
 
-    save_bookmarks("bookmarks.csv");
+    save_bookmarks("local/bookmarks.csv");
 }

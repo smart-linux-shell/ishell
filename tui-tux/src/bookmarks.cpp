@@ -1,11 +1,15 @@
-#include "bookmarks.hpp"
 #include <fstream>
 #include <sstream>
 #include <iostream>
 #include <algorithm>
 #include <readline/readline.h>
 #include <readline/history.h>
-#include "assistant_query.hpp"
+#include "../nlohmann/json.hpp"
+
+#include "../include/bookmarks.hpp"
+#include "../include/assistant_query.hpp"
+
+using json = nlohmann::json;
 
 // <alias:<query, result>>
 std::unordered_map<std::string, std::pair<std::string, std::string>> bookmarks;
@@ -142,7 +146,7 @@ void remove_bookmark(const std::string &alias) {
 }
 
 void list_bookmarks() {
-    std::cout << "BOOKMARK" << "\t\t" << "QUERY" << "\n";
+    std::cout << "BOOKMARK" << "\t\t\t" << "QUERY" << "\n";
     for (std::unordered_map<std::string, std::pair<std::string, std::string>>::const_iterator it = bookmarks.begin(); it != bookmarks.end(); ++it) {
         std::cout << it->first << "\t\t\t" << it->second.first << "\n";
     }
