@@ -1,6 +1,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <iomanip>
 #include <algorithm>
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -20,19 +21,16 @@ bool create_bookmarks_file(const std::string &filename) {
         std::cerr << "Error creating file: " << filename << "\n";
         return false;
     }
-    create_file << "alias,query,result\n";  // add header
+    json empty_bookmarks = json::array();
+    create_file << empty_bookmarks.dump(4);
     return true;
 }
 
-void parse_bookmark_line(const std::string &line) {
-    std::istringstream iss(line);
-    std::string alias, query, result;
-    if (std::getline(iss, alias, ',') && std::getline(iss, query, ',')) {
-        if (!std::getline(iss, result)) {
-            result = "";
-        }
-        bookmarks[alias] = {query, result};
-    }
+void parse_bookmark_json(const json &bookmark) {
+    std::string alias = bookmark.at("alias").get<std::string>();
+    std::string query = bookmark.at("query").get<std::string>();
+    std::string result = bookmark.at("result").get<std::string>();
+    bookmarks[alias] = {query, result};
 }
 
 void load_bookmarks(const std::string &filename) {
@@ -41,12 +39,12 @@ void load_bookmarks(const std::string &filename) {
         if (!create_bookmarks_file(filename)) {
             return;
         }
-        return;  // no bookmarks - no load
+        return;  // no bookmarks to load if the file is newly created
     }
-    std::string line;
-    std::getline(file, line); // skip the header
-    while (std::getline(file, line)) {
-        parse_bookmark_line(line);
+    json bookmark_json;
+    file >> bookmark_json;
+    for (const auto &bookmark : bookmark_json) {
+        parse_bookmark_json(bookmark);
     }
 }
 
@@ -56,10 +54,15 @@ void save_bookmarks(const std::string &filename) {
         std::cerr << "Error opening file: " << filename << "\n";
         return;
     }
-    file << "alias,query,result\n";
-    for (std::unordered_map<std::string, std::pair<std::string, std::string>>::const_iterator it = bookmarks.begin(); it != bookmarks.end(); ++it) {
-        file << it->first << "," << it->second.first << "," << it->second.second << "\n";
+    json bookmark_json = json::array();
+    for (const auto &bookmark : bookmarks) {
+        json entry;
+        entry["alias"] = bookmark.first;
+        entry["query"] = bookmark.second.first;
+        entry["result"] = bookmark.second.second;
+        bookmark_json.push_back(entry); // Add entry to the array
     }
+    file << bookmark_json.dump(4);
     file.close();
 }
 
@@ -146,9 +149,14 @@ void remove_bookmark(const std::string &alias) {
 }
 
 void list_bookmarks() {
-    std::cout << "BOOKMARK" << "\t\t\t" << "QUERY" << "\n";
+    const int alias_width = 20;
+    const int query_width = 50;
+    std::cout << std::left << std::setw(alias_width) << "BOOKMARK"
+              << std::setw(query_width) << "QUERY" << "\n";
     for (std::unordered_map<std::string, std::pair<std::string, std::string>>::const_iterator it = bookmarks.begin(); it != bookmarks.end(); ++it) {
-        std::cout << it->first << "\t\t\t" << it->second.first << "\n";
+        std::cout << std::left << std::setw(alias_width) << it->first
+                  << std::setw(query_width) << it->second.first
+                  << "\n";
     }
 }
 

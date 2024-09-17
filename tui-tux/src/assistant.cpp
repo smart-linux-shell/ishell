@@ -17,7 +17,7 @@ std::vector<std::pair<std::string, std::string>> session_history;
 void assistant() {
     using_history();
     get_agency_url();
-    load_bookmarks("local/bookmarks.csv");
+    load_bookmarks("local/bookmarks.json");
 
     while (1) {
         char *input = readline("assistant> ");
@@ -52,5 +52,5 @@ void assistant() {
         free(input);
     }
 
-    save_bookmarks("local/bookmarks.csv");
+    save_bookmarks("local/bookmarks.json");
 }

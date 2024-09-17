@@ -35,7 +35,7 @@ This introduces bookmarking functionality to the assistant queries. It allows us
   
 ### Implementation Details
 
-Queries are recorded during the session and are lost after it ends. Bookmarks are saved in a local `bookmarks.csv` file and persist across sessions.
+Queries are recorded during the session and are lost after it ends. Bookmarks are saved in a local `bookmarks.json` file and persist across sessions.
 The full code and implementation details are available [here](https://github.com/smart-linux-shell/ishell/blob/32_bookmarking/tui-tux/bookmarks.cpp).
 
 ### Future work
