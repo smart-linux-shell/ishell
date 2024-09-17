@@ -4,22 +4,20 @@
 #include <stdlib.h>
 
 #include <iostream>
+#include <algorithm>
 
+#include "../include/assistant_query.hpp"
+#include "../include/bookmarks.hpp"
 #include "../include/agency_request_wrapper.hpp"
+
+
+// <query, result>
+std::vector<std::pair<std::string, std::string>> session_history;
 
 void assistant() {
     using_history();
-
-    std::string agency_url, assistant_url;
-    char *agency_url_env;
-    bool agency_url_set;
-
-    agency_url_env = getenv("ISHELL_AGENCY_URL");
-    if (agency_url_env != NULL) {
-        agency_url_set = true;
-        agency_url = agency_url_env;
-        assistant_url = agency_url + "/assistant";
-    }
+    get_agency_url();
+    load_bookmarks("local/bookmarks.json");
 
     while (1) {
         char *input = readline("assistant> ");
@@ -28,17 +26,31 @@ void assistant() {
             break;
         }
 
-        add_history(input);
+        std::string input_str(input);
 
-        if (!agency_url_set) {
-            std::cout << "ISHELL_AGENCY_URL not set\n";
-            continue;
+        if (is_bookmark_command(input_str)) {
+            handle_bookmark_command(input_str, session_history);
+        } else {
+            std::istringstream iss(input_str);
+            std::string alias, option;
+            iss >> alias >> option;
+            if (is_bookmark_flag(option) && is_bookmark(alias)) {
+                // use bookmarked
+                auto [query, result] = get_bookmark(alias);
+                session_history.push_back({query, result});
+                std::cout << result << "\n";
+            } else if (is_remove_flag(option)) {
+                // remove bookmark
+                remove_bookmark(alias);
+            } else {
+                // new query to assistant
+                add_history(input);
+                std::string result = execute_query(input_str, session_history);
+                std::cout << result << "\n";
+            }
         }
-
-        std::string result = ask_agent(assistant_url, std::string(input));
-
-        std::cout << result << "\n";
-
         free(input);
     }
+
+    save_bookmarks("local/bookmarks.json");
 }

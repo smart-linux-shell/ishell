@@ -1,0 +1,23 @@
+Bookmark Command Help:
+
+Usage:
+  bookmark <index> <alias>          Bookmark the command at the given history index with the specified alias.
+  bookmark <alias>                  Bookmark the last executed command with the specified alias.
+  bookmark -l                       List all saved bookmarks.
+  bookmark --list                   List all saved bookmarks.
+  bookmark -r <alias>               Remove the bookmark with the specified alias.
+  bookmark --remove <alias>         Remove the bookmark with the specified alias.
+  bookmark --help                   Show this help message.
+
+Options:
+  <index>                           The index of the command in the history to be bookmarked.
+  <alias>                           A unique name to identify the bookmarked command.
+
+Examples:
+  bookmark 3 myAlias                Bookmark the command at history index 3 with the alias 'myAlias'.
+  bookmark myAlias                  Bookmark the last executed command with the alias 'myAlias'.
+  bookmark -l                       List all current bookmarks.
+  bookmark -r myAlias               Remove the bookmark with the alias 'myAlias'.
+  bookmark --remove myAlias         Remove the bookmark with the alias 'myAlias'.
+  bookmark --help                   Show this help message.
+

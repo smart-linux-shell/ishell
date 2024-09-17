@@ -1,5 +1,5 @@
 TARGET := ishell
-SOURCES := screen_ring_buffer.cpp screen.cpp escape.cpp assistant.cpp terminal_multiplexer.cpp main.cpp agency_request_wrapper.cpp https_client.cpp
+SOURCES := screen_ring_buffer.cpp screen.cpp escape.cpp assistant_query.cpp bookmarks.cpp assistant.cpp terminal_multiplexer.cpp main.cpp agency_request_wrapper.cpp https_client.cpp
 OBJECTS := $(patsubst %.cpp,%.o,$(SOURCES))
 
 OBJECTS := $(patsubst %, bin/%, $(OBJECTS))
@@ -29,7 +29,7 @@ FLAGS := -Wall
 install: $(TARGET)
 	install -d $(DESTDIR)$(BINDIR)
 	install -m 755 $(TARGET) $(DESTDIR)$(BINDIR)
-	
+
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/$(TARGET)
 
