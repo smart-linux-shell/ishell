@@ -6,8 +6,8 @@ OBJECTS := $(patsubst %.cpp,%.o,$(SOURCES))
 OBJECTS := $(patsubst %, bin/%, $(OBJECTS))
 SOURCES := $(patsubst %, src/%, $(SOURCES))
 
-TEST_SOURCES := test_bookmarks.cpp
-TEST_OBJECTS := $(patsubst test/%.cpp,bin/test/%.o,$(TEST_SOURCES))
+TEST_SOURCES := test/test_bookmarks.cpp
+TEST_OBJECTS := $(patsubst test/%.cpp, bin/test/%.o,$(TEST_SOURCES))
 
 INCLUDE := -Iinclude
 LIBS := -lncurses -lreadline -lcurl -lgtest -lgmock -lpthread

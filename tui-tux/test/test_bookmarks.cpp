@@ -69,3 +69,8 @@ TEST(BookmarksTest, ExecutesQueryIfResultNotFoundInSessionHistory) {
     EXPECT_EQ(get_bookmark("test_alias").first, "test_query");
     EXPECT_EQ(get_bookmark("test_alias").second, query_result);
 }
+
+int main(int argc, char **argv) {
+    testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
+}
