@@ -10,7 +10,7 @@
 
 #define E_KEY_CLEAR 256
 
-// Erase in place 1 char
+// Erase in place
 #define E_KEY_DCH 257
 
 // Erase to EOL 1 char
@@ -43,9 +43,10 @@
 struct TerminalChar {
     int ch;
     std::vector<int> args;
+    std::string sequence;
 };
 
-void escape(std::string &seq, Screen &bash_screen);
+TerminalChar escape(std::string &seq);
 int read_and_escape(int fd, std::vector<TerminalChar> &vec);
 
 #endif

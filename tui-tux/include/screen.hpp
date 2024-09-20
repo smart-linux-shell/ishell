@@ -23,7 +23,7 @@ public:
     void cursor_forward();
     void cursor_up();
     void clear();
-    void erase_in_place();
+    void erase(int del_cnt);
     void erase_to_eol();
     void cursor_down();
     void scroll_down();

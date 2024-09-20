@@ -130,6 +130,37 @@ bool ScreenRingBuffer::has_new_line(int terminal_y) {
     return lines[y].new_paragraph;
 }
 
+void ScreenRingBuffer::push_left(int terminal_y, int terminal_x) {
+    if (is_out_of_terminal_bounds(terminal_y, terminal_x)) {
+        return;
+    }
+
+    int y = (terminal_begin_line + terminal_y) % max_lines;
+    int x = terminal_x;
+
+    bool looping = true;
+
+    while (looping) {
+        // Move all chars on the line to the left
+        while (x < terminal_cols - 1) {
+            lines[y].data[x] = lines[y].data[x + 1];
+            x++;
+        }
+
+        int next_y = (y + 1) % max_lines;
+        if (!lines[y].new_paragraph && !is_out_of_terminal_bounds(next_y, 0)) {
+            // Can keep pushing left on the next line. Should also grab first
+            // character from the next line and place it at the end of this one.
+            lines[y].data[terminal_cols - 1] = lines[next_y].data[0];
+            x = 0;
+            y = next_y;
+        } else {
+            // Over
+            looping = false;
+        }
+    }
+}
+
 void ScreenRingBuffer::push_right(int terminal_y, int terminal_x) {
     if (is_out_of_terminal_bounds(terminal_y, terminal_x)) {
         return;
@@ -154,6 +185,7 @@ void ScreenRingBuffer::push_right(int terminal_y, int terminal_x) {
             // Push right. If empty spaces are found on the line (that can be used to fill), stop here.
             if (lines[y].data[x] == 0) {
                 looping = false;
+                break;
             }
 
             lines[y].data[x] = lines[y].data[x - 1];

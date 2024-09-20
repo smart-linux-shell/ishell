@@ -472,7 +472,11 @@ int TerminalMultiplexer::handle_screen_output(Screen &screen, int fd) {
                 if (tch.ch == E_KEY_CLEAR) {
                     screen.clear();
                 } else if (tch.ch == E_KEY_DCH) {
-                    screen.erase_in_place();
+                    int del_cnt = 1;
+                    if (tch.args.size() == 1) {
+                        del_cnt = tch.args[0];
+                    }
+                    screen.erase(del_cnt);
                 } else if (tch.ch == E_KEY_EL) {
                     screen.erase_to_eol();
                 } else if (tch.ch == E_KEY_CUP) {
@@ -526,7 +530,9 @@ int TerminalMultiplexer::handle_screen_output(Screen &screen, int fd) {
                 continue;
             }
 
-            screen.write_char(tch.ch);
+            if (tch.ch > 0 && tch.ch < 256) {
+                screen.write_char(tch.ch);
+            }
         }
 
     }
@@ -577,8 +583,10 @@ int TerminalMultiplexer::handle_input() {
                 } else if (tch.ch == E_KEY_CUD) {
                     screens[focus].manual_scroll_down();
                 }
-            } else if (tch.ch > 0 && tch.ch < 256) {
-                handle_pty_input(screens[focus].get_pty_master(), tch.ch);
+            } else {
+                for (char ch : tch.sequence) {
+                    handle_pty_input(screens[focus].get_pty_master(), ch);
+                }
             }
         }
     }

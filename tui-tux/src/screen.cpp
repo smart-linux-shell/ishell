@@ -112,15 +112,15 @@ void Screen::clear() {
     srefresh();
 }
 
-void Screen::erase_in_place() {
+void Screen::erase(int del_cnt) {
     int curx = get_x();
     int cury = get_y();
     
-    buffer.add_char(cury, curx, 0);
+    for (int i = 0; i < del_cnt; i++) {
+        buffer.push_left(cury, curx);
+    }
 
-    sdelch();
-
-    srefresh();
+    show_all_chars();
 }
 
 void Screen::erase_to_eol() {

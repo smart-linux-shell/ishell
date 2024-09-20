@@ -17,7 +17,8 @@ public:
     int new_line(int terminal_y);
     int clear();
     bool has_new_line(int terminal_y);
-    void push_right(int termianl_y, int terminal_x);
+    void push_left(int terminal_y, int terminal_x);
+    void push_right(int terminal_y, int terminal_x);
 
     const bool is_in_manual_scroll();
     void enter_manual_scroll();
