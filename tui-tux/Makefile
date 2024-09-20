@@ -10,10 +10,10 @@ TEST_SOURCES := test/test_bookmarks.cpp
 TEST_OBJECTS := $(patsubst test/%.cpp, bin/test/%.o,$(TEST_SOURCES))
 
 INCLUDE := -Iinclude
-LIBS := -lncurses -lreadline -lcurl -lgtest -lgmock -lpthread
+LIBS := -lncurses -lreadline -lcurl -L/usr/local/lib -lgtest -lgmock -lgtest_main -lpthread
 
 FLAGS := -Wall
-CXXFLAGS := $(FLAGS)
+CXXFLAGS := $(FLAGS) -std=c++11
 
 Cxx := g++
 
