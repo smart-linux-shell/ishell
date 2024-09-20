@@ -442,7 +442,7 @@ int TerminalMultiplexer::handle_screen_output(Screen &screen, int fd) {
     if (n > 0) {        
         for (TerminalChar &tch : chars) {
             // CR
-            if (tch.ch == 0x0d) {
+            if (tch.ch == '\r') {
                 screen.cursor_return();
                 continue;
             }
@@ -453,17 +453,17 @@ int TerminalMultiplexer::handle_screen_output(Screen &screen, int fd) {
             }
 
             // BEL (ignore)
-            if (tch.ch == 0x07) {
+            if (tch.ch == KEY_BEL) {
                 continue;
             }
 
             // Disable alt charset (ignore)
-            if (tch.ch == 0x0f) {
+            if (tch.ch == KEY_SI) {
                 continue;
             }
 
             // BKSP
-            if (tch.ch == 0x08) {
+            if (tch.ch == KEY_BS) {
                 screen.cursor_back();
                 continue;
             }
