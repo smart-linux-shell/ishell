@@ -247,7 +247,7 @@ void Screen::manual_scroll_down() {
 void Screen::manual_scroll_reset() {
     buffer.manual_scroll_reset();
     std::pair<int, int> pair = show_all_chars();
-    smove(pair.second, pair.first);
+    move_cursor(pair.second, pair.first);
 }
 
 void Screen::init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *new_outer, int new_pty_master, int new_pid) {
