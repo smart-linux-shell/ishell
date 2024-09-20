@@ -1,19 +1,25 @@
 TARGET := ishell
 TEST_TARGET := test_ishell
-SOURCES := screen_ring_buffer.cpp screen.cpp escape.cpp assistant_query.cpp bookmarks.cpp assistant.cpp terminal_multiplexer.cpp main.cpp agency_request_wrapper.cpp https_client.cpp
-OBJECTS := $(patsubst %.cpp,%.o,$(SOURCES))
 
-OBJECTS := $(patsubst %, bin/%, $(OBJECTS))
+# Configurable
+NO_MAIN_SOURCES := screen_ring_buffer.cpp screen.cpp escape.cpp assistant_query.cpp bookmarks.cpp assistant.cpp terminal_multiplexer.cpp agency_request_wrapper.cpp https_client.cpp
+SOURCES := $(NO_MAIN_SOURCES) main.cpp
+TEST_SOURCES := test_bookmarks.cpp
+FLAGS := -Wall
+LIBS := -lncurses -lreadline -lcurl
+TEST_EXTRA_LIBS := -lgtest -lgmock #-L/usr/local/lib -lgtest_main -lpthread
+
+NO_MAIN_OBJECTS := $(patsubst %.cpp,%.o,$(patsubst %, bin/%, $(NO_MAIN_SOURCES)))
+OBJECTS := $(patsubst %.cpp,%.o,$(patsubst %, bin/%, $(SOURCES)))
+TEST_OBJECTS := $(patsubst %.cpp, %.o, $(patsubst %, bin/test/%, $(TEST_SOURCES)))
+
 SOURCES := $(patsubst %, src/%, $(SOURCES))
-
-TEST_SOURCES := test/test_bookmarks.cpp
-TEST_OBJECTS := $(patsubst test/%.cpp, bin/test/%.o,$(TEST_SOURCES))
+NO_MAIN_SOURCES := $(patsubst %, src/%, $(NO_MAIN_SOURCES))
+TEST_SOURCES := $(patsubst %, test/%, $(TEST_SOURCES))
 
 INCLUDE := -Iinclude
-LIBS := -lncurses -lreadline -lcurl -L/usr/local/lib -lgtest -lgmock -lgtest_main -lpthread
 
-FLAGS := -Wall
-CXXFLAGS := $(FLAGS) -std=c++11
+CXXFLAGS := $(FLAGS) -std=c++17
 
 Cxx := g++
 
@@ -33,8 +39,8 @@ bin/test/%.o: test/%.cpp
 	$(Cxx) $(CXXFLAGS) $(INCLUDE) -c $< -o $@
 
 # Link and build the test executable
-test: $(TEST_OBJECTS)
-	$(Cxx) $(CXXFLAGS) $(INCLUDE) $(TEST_OBJECTS) src/bookmarks.cpp -o $(TEST_TARGET) $(LIBS)
+test: $(TEST_OBJECTS) $(NO_MAIN_OBJECTS)
+	$(Cxx) $(CXXFLAGS) $(INCLUDE) $(TEST_OBJECTS) $(NO_MAIN_OBJECTS) -o $(TEST_TARGET) $(LIBS) $(TEST_EXTRA_LIBS)
 
 run_test: test
 	./$(TEST_TARGET)
