@@ -138,8 +138,6 @@ void TerminalMultiplexer::init() {
         exit(EXIT_FAILURE);
     }
 
-    fgetc(stdin);
-
     // Create temporary unsized screens
     screens.push_back(Screen(0, 0, NULL, NULL, pty_assistant_master, assistant_pid));
     screens.push_back(Screen(0, 0, NULL, NULL, pty_bash_master, bash_pid));
@@ -426,11 +424,8 @@ void TerminalMultiplexer::run_terminal() {
 }
 
 int TerminalMultiplexer::handle_screen_output(Screen &screen, int fd) {
-    static int escape_status = ANSI_NULL;
-    static std::string escape_seq = "";
-
-    char buffer[256];
-    int n = read(fd, buffer, sizeof(buffer));
+    std::vector<TerminalChar> chars;
+    int n = read_and_escape(fd, chars);
 
     if (n < 0) {
         if (errno == EIO) {
@@ -444,63 +439,94 @@ int TerminalMultiplexer::handle_screen_output(Screen &screen, int fd) {
         exit(EXIT_FAILURE);
     }
 
-    if (n > 0) {
-        buffer[n] = '\0';
-        
-        for (int i = 0; i < n; i++) {
+    if (n > 0) {        
+        for (TerminalChar &tch : chars) {
             // CR
-            if (escape_status == ANSI_NULL && buffer[i] == 0x0d) {
+            if (tch.ch == 0x0d) {
                 screen.cursor_return();
                 continue;
             }
 
-            if (escape_status == ANSI_NULL && buffer[i] == '\n') {
+            if (tch.ch == '\n') {
                 screen.newline();
                 continue;
             }
 
             // BEL (ignore)
-            if (escape_status == ANSI_NULL && buffer[i] == 0x07) {
+            if (tch.ch == 0x07) {
                 continue;
             }
 
             // Disable alt charset (ignore)
-            if (escape_status == ANSI_NULL && buffer[i] == 0x0f) {
+            if (tch.ch == 0x0f) {
                 continue;
             }
 
             // BKSP
-            if (escape_status == ANSI_NULL && buffer[i] == 0x08) {
+            if (tch.ch == 0x08) {
                 screen.cursor_back();
                 continue;
             }
 
-            // ESC sequence
-            if (buffer[i] == 0x1B) {
-                escape_status = ANSI_IN_ESCAPE;
-                continue;
-            }
-
-            if (escape_status == ANSI_IN_ESCAPE) {
-                if (buffer[i] == 0x5B) {
-                    escape_seq += buffer[i];
-                } else if (buffer[i] == 0x9C) {
-                    escape(escape_seq, screen);
-                    escape_status = ANSI_NULL;
-                    escape_seq = "";
-                } else if ((buffer[i] >= 0x40 && buffer[i] <= 0x7E) || (buffer[i] == 0x9C)) {
-                    escape_seq += buffer[i];
-                    escape(escape_seq, screen);
-                    escape_status = ANSI_NULL;
-                    escape_seq = "";
-                } else {
-                    escape_seq += buffer[i];
+            if (tch.ch > 255) {
+                if (tch.ch == E_KEY_CLEAR) {
+                    screen.clear();
+                } else if (tch.ch == E_KEY_DCH) {
+                    screen.erase_in_place();
+                } else if (tch.ch == E_KEY_EL) {
+                    screen.erase_to_eol();
+                } else if (tch.ch == E_KEY_CUP) {
+                    int y = 1;
+                    int x = 1;
+                    if (tch.args.size() == 2) {
+                        y = tch.args[0];
+                        x = tch.args[1];
+                    }
+                    screen.move_cursor(y - 1, x - 1);
+                } else if (tch.ch == E_KEY_VPA) {
+                    int y = 1;
+                    if (tch.args.size() == 1) {
+                        y = tch.args[0];
+                    }
+                    screen.move_cursor(y - 1, screen.get_x());
+                } else if (tch.ch == E_KEY_CUB) {
+                    int x_offs = 1;
+                    if (tch.args.size() == 1) {
+                        x_offs = tch.args[0];
+                    }
+                    screen.move_cursor(screen.get_y(), screen.get_x() - x_offs);
+                } else if (tch.ch == E_KEY_CUF) {
+                    int x_offs = 1;
+                    if (tch.args.size() == 1) {
+                        x_offs = tch.args[0];
+                    }
+                    screen.move_cursor(screen.get_y(), screen.get_x() + x_offs);
+                } else if (tch.ch == E_KEY_CUU) {
+                    int y_offs = 1;
+                    if (tch.args.size() == 1) {
+                        y_offs = tch.args[0];
+                    }
+                    screen.move_cursor(screen.get_y() - y_offs, screen.get_x());
+                } else if (tch.ch == E_KEY_CUD) {
+                    int y_offs = 1;
+                    if (tch.args.size() == 1) {
+                        y_offs = tch.args[0];
+                    }
+                    screen.move_cursor(screen.get_y() + y_offs, screen.get_x());
+                } else if (tch.ch == E_KEY_RI) {
+                    screen.scroll_up();
+                } else if (tch.ch == E_KEY_ICH) {
+                    int num = 1;
+                    if (tch.args.size() == 1) {
+                        num = tch.args[0];
+                    }
+                    screen.insert_next(num);
                 }
 
                 continue;
             }
 
-            screen.write_char(buffer[i]);
+            screen.write_char(tch.ch);
         }
 
     }
@@ -519,35 +545,41 @@ int TerminalMultiplexer::handle_input() {
     therefore, read straight from stdin; do not use wgetch.
     */
 
-    char buf[256];
-    int n = read(STDIN_FILENO, buf, sizeof(buf));
+    std::vector<TerminalChar> chars;
+    int n = read_and_escape(STDIN_FILENO, chars);
 
     if (n < 0) {
         perror("read");
         exit(EXIT_FAILURE);
     }
 
-    for (int i = 0; i < n; i++) {
-        char ch = buf[i];
-        
-        if (ch == 0x02) {
+    for (TerminalChar &tch : chars) {        
+        if (tch.ch == 0x02) {
             // Pressed ^B
             waiting_for_command = true;
         } else if (waiting_for_command) {
             waiting_for_command = false;
-            if (ch == '\t') {
+            if (tch.ch == '\t') {
                 switch_focus();
-            } else if (ch == 'Z' || ch == 'z') {
+            } else if (tch.ch == 'Z' || tch.ch == 'z') {
                 if (!zoomed_in) {
                     zoom_in();
                 } else {
                     zoom_out();
                 }
-            } else if (ch == '[') {
-                
+            } else if (tch.ch == '[') {
+                toggle_manual_scroll();
             }
         } else if (focus != FOCUS_NULL) {
-            handle_pty_input(screens[focus].get_pty_master(), ch);
+            if (screens[focus].is_in_manual_scroll()) {
+                if (tch.ch == E_KEY_CUU) {
+                    screens[focus].manual_scroll_up();
+                } else if (tch.ch == E_KEY_CUD) {
+                    screens[focus].manual_scroll_down();
+                }
+            } else if (tch.ch > 0 && tch.ch < 256) {
+                handle_pty_input(screens[focus].get_pty_master(), tch.ch);
+            }
         }
     }
 
@@ -566,4 +598,14 @@ void TerminalMultiplexer::zoom_in() {
 void TerminalMultiplexer::zoom_out() {
     zoomed_in = false;
     resize();
+}
+
+void TerminalMultiplexer::toggle_manual_scroll() {
+    if (focus != FOCUS_NULL) {
+        if (screens[focus].is_in_manual_scroll()) {
+            screens[focus].manual_scroll_reset();
+        } else {
+            screens[focus].enter_manual_scroll();
+        }
+    }
 }

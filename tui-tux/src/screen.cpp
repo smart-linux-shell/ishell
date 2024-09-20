@@ -14,10 +14,6 @@ Screen::Screen(int lines, int cols, WINDOW *window, WINDOW *outer, Screen &old_s
     init(lines, cols, window, outer, old_screen);
 }
 
-Screen::~Screen() {
-    cleanup();
-}
-
 int Screen::get_n_lines() {
     return n_lines;
 }
@@ -220,14 +216,38 @@ void Screen::push_right() {
     buffer.push_right(cury, curx);
 }
 
-void Screen::set_displayed_scroller_screen(Screen &scroller_screen) {
-    if (displayed_scroller_screen != NULL) {
-        delete displayed_scroller_screen;
-        displayed_scroller_screen = NULL;
-    }
+const bool Screen::is_in_manual_scroll() {
+    return buffer.is_in_manual_scroll();
+}
 
-    displayed_scroller_screen = new Screen;
-    *displayed_scroller_screen = scroller_screen;
+void Screen::enter_manual_scroll() {
+    buffer.enter_manual_scroll();
+}
+
+void Screen::manual_scroll_up() {
+    if (sgety() > 0) {
+        smove(sgety() - 1, sgetx());
+        srefresh();
+    } else {
+        buffer.manual_scroll_up();
+        show_all_chars();
+    }
+}
+
+void Screen::manual_scroll_down() {
+    if (sgety() < n_lines - 1) {
+        smove(sgety() + 1, sgetx());
+        srefresh();
+    } else {
+        buffer.manual_scroll_down();
+        show_all_chars();
+    }
+}
+
+void Screen::manual_scroll_reset() {
+    buffer.manual_scroll_reset();
+    std::pair<int, int> pair = show_all_chars();
+    smove(pair.second, pair.first);
 }
 
 void Screen::init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *new_outer, int new_pty_master, int new_pid) {
@@ -239,7 +259,6 @@ void Screen::init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *new_o
     pty_master = new_pty_master;
     pid = new_pid;
     pushing_right = 0;
-    displayed_scroller_screen = NULL;
 
     if (window == NULL) {
         fallback_x = 0;
@@ -313,13 +332,6 @@ std::pair<int, int> Screen::show_all_chars() {
     srefresh();
 
     return pair;
-}
-
-void Screen::cleanup() {
-    if (displayed_scroller_screen != NULL) {
-        delete displayed_scroller_screen;
-        displayed_scroller_screen = NULL;
-    }
 }
 
 // Wrappers

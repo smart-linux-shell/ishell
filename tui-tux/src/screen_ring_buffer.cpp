@@ -32,7 +32,14 @@ int ScreenRingBuffer::add_char(int terminal_y, int terminal_x, char ch) {
 }
 
 const char ScreenRingBuffer::get_char(int terminal_y, int terminal_x) {
-    int y = (terminal_begin_line + terminal_y) % max_lines;
+    int y;
+    
+    if (manual_scroll_begin_line == MANUAL_SCROLL_NULL) {
+        y = (terminal_begin_line + terminal_y) % max_lines;
+    } else {
+        y = (manual_scroll_begin_line + terminal_y) % max_lines;
+    }
+    
     int x = terminal_x;
 
     if (is_out_of_terminal_bounds(terminal_y, terminal_x)) {
@@ -187,10 +194,40 @@ void ScreenRingBuffer::push_right(int terminal_y, int terminal_x) {
     }
 }
 
+const bool ScreenRingBuffer::is_in_manual_scroll() {
+    return manual_scroll_begin_line != MANUAL_SCROLL_NULL;
+}
+
+void ScreenRingBuffer::enter_manual_scroll() {
+    manual_scroll_begin_line = terminal_begin_line;
+}
+
+void ScreenRingBuffer::manual_scroll_up() {
+    if (manual_scroll_begin_line != start_line) {
+        // Can go further up
+        manual_scroll_begin_line--;
+        if (manual_scroll_begin_line < 0) {
+            manual_scroll_begin_line += max_lines;
+        }
+    }
+}
+
+void ScreenRingBuffer::manual_scroll_down() {
+    if (manual_scroll_begin_line != terminal_begin_line) {
+        // Can go further down
+        manual_scroll_begin_line = (manual_scroll_begin_line + 1) % max_lines;
+    }
+}
+
+void ScreenRingBuffer::manual_scroll_reset() {
+    manual_scroll_begin_line = MANUAL_SCROLL_NULL;
+}
+
 void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines) {
     this->terminal_lines = terminal_lines;
     this->terminal_cols = terminal_cols;
     this->max_lines = max_lines;
+    manual_scroll_begin_line = MANUAL_SCROLL_NULL;
 
     clear();
 }

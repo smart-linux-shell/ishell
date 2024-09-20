@@ -1,6 +1,8 @@
 #ifndef ISHELL_SCREEN_RING_BUFFER
 #define ISHELL_SCREEN_RING_BUFFER
 
+#define MANUAL_SCROLL_NULL -1
+
 #include <vector>
 
 class ScreenRingBuffer {
@@ -17,12 +19,23 @@ public:
     bool has_new_line(int terminal_y);
     void push_right(int termianl_y, int terminal_x);
 
+    const bool is_in_manual_scroll();
+    void enter_manual_scroll();
+    void manual_scroll_up();
+    void manual_scroll_down();
+    void manual_scroll_reset();
+
 private:
     int terminal_lines, terminal_cols, max_lines;
     int start_line;
     int filled_lines;
 
+    // This is the line in the ring buffer where the current terminal view starts
     int terminal_begin_line;
+
+    // This is the line in the ring buffer used as a begin line for getting chars.
+    // Normally set as -1, but when in manual scroll mode it will be a positive value.
+    int manual_scroll_begin_line;
 
     struct Line {
         std::vector<char> data;

@@ -11,7 +11,6 @@ public:
     Screen();
     Screen(int lines, int cols, WINDOW *window, WINDOW *outer, int pty_master, int pid);
     Screen(int lines, int cols, WINDOW *window, WINDOW *outer, Screen &old_screen);
-    ~Screen();
     int get_n_lines();
     int get_n_cols();
     void write_char(char ch);
@@ -36,7 +35,12 @@ public:
     void delete_wins();
     void insert_next(int num);
     void push_right();
-    void set_displayed_scroller_screen(Screen &scroller_screen);
+
+    const bool is_in_manual_scroll();
+    void enter_manual_scroll();
+    void manual_scroll_up();
+    void manual_scroll_down();
+    void manual_scroll_reset();
 
 private:
     int n_lines, n_cols;
@@ -54,12 +58,6 @@ private:
     WINDOW *outer;
 
     ScreenRingBuffer buffer;
-
-    // This is a pointer that is only used when in manual scrolling mode. (otherwise NULL)
-    // When manually scrolling, the original screen goes out of view (window is set to NULL),
-    // while still being responsible for handling any screen outputs. A new screen is created,
-    // which is a clone of the current screen, which will handle the scrolling.
-    Screen *displayed_scroller_screen;
 
     void init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *outer, int new_pty_master, int new_pid);
     void init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *outer, Screen &old_screen);
