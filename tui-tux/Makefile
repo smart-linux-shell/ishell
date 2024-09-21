@@ -2,12 +2,12 @@ TARGET := ishell
 TEST_TARGET := test_ishell
 
 # Configurable
-NO_MAIN_SOURCES := screen_ring_buffer.cpp screen.cpp escape.cpp assistant_query.cpp bookmarks.cpp assistant.cpp terminal_multiplexer.cpp agency_request_wrapper.cpp https_client.cpp
+NO_MAIN_SOURCES := screen_ring_buffer.cpp screen.cpp escape.cpp agency_manager.cpp bookmark_manager.cpp assistant.cpp terminal_multiplexer.cpp agency_request_wrapper.cpp https_client.cpp
 SOURCES := $(NO_MAIN_SOURCES) main.cpp
-TEST_SOURCES := test_bookmarks.cpp
+TEST_SOURCES := test_bookmark_manager.cpp
 FLAGS := -Wall
 LIBS := -lncurses -lreadline -lcurl
-TEST_EXTRA_LIBS := -lgtest -lgmock #-L/usr/local/lib -lgtest_main -lpthread
+TEST_EXTRA_LIBS := -lgtest -lgmock -L/usr/local/lib -lgtest_main -lpthread
 
 NO_MAIN_OBJECTS := $(patsubst %.cpp,%.o,$(patsubst %, bin/%, $(NO_MAIN_SOURCES)))
 OBJECTS := $(patsubst %.cpp,%.o,$(patsubst %, bin/%, $(SOURCES)))
