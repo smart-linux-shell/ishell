@@ -5,17 +5,9 @@
 #include <sstream>
 #include <map>
 
-using json = nlohmann::json;
+#include "../include/https_client.hpp"
 
-enum class HttpRequestType {
-    GET,
-    POST,
-    PUT,
-    DELETE,
-    HEAD,
-    OPTIONS,
-    PATCH
-};
+using json = nlohmann::json;
 
 // Helper function to handle the response body
 static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* s) {
@@ -36,7 +28,7 @@ static size_t HeaderCallback(char* buffer, size_t size, size_t nitems, std::map<
 }
 
 // Function to convert query parameters to a URL-encoded string
-std::string build_query_string(const std::map<std::string, std::string>& query_params) {
+std::string HttpsClient::build_query_string(const std::map<std::string, std::string>& query_params) {
     std::stringstream ss;
     for (const auto& param : query_params) {
         ss << param.first << "=" << param.second << "&";
@@ -49,7 +41,7 @@ std::string build_query_string(const std::map<std::string, std::string>& query_p
 }
 
 // Function to set CURL options based on the request type
-void set_request_type(CURL* curl, HttpRequestType request_type) {
+void HttpsClient::set_request_type(CURL* curl, HttpRequestType request_type) {
     switch (request_type) {
         case HttpRequestType::POST:
             curl_easy_setopt(curl, CURLOPT_POST, 1L);
@@ -75,7 +67,7 @@ void set_request_type(CURL* curl, HttpRequestType request_type) {
 }
 
 // Function to add request body
-void add_request_body(CURL* curl, HttpRequestType request_type, const json& body, std::string& jsonData) {
+void HttpsClient::add_request_body(CURL* curl, HttpRequestType request_type, const json& body, std::string& jsonData) {
     if (request_type == HttpRequestType::POST ||
         request_type == HttpRequestType::PUT ||
         request_type == HttpRequestType::PATCH ||
@@ -87,7 +79,7 @@ void add_request_body(CURL* curl, HttpRequestType request_type, const json& body
 }
 
 // Function to add request headers
-void add_request_headers(CURL* curl, const std::map<std::string, std::string>& headers) {
+void HttpsClient::add_request_headers(CURL* curl, const std::map<std::string, std::string>& headers) {
     struct curl_slist* curl_headers = nullptr;
     for (const auto& header : headers) {
         std::string header_string = header.first + ": " + header.second;
@@ -99,7 +91,7 @@ void add_request_headers(CURL* curl, const std::map<std::string, std::string>& h
 }
 
 // Function to set CURL options for handling the response
-void set_response_callbacks(CURL* curl, std::string& readBuffer, std::map<std::string, std::string>& response_headers) {
+void HttpsClient::set_response_callbacks(CURL* curl, std::string& readBuffer, std::map<std::string, std::string>& response_headers) {
     curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, HeaderCallback);
     curl_easy_setopt(curl, CURLOPT_HEADERDATA, &response_headers);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
@@ -107,7 +99,7 @@ void set_response_callbacks(CURL* curl, std::string& readBuffer, std::map<std::s
 }
 
 // Function to perform the CURL request and handle the response
-json perform_request(CURL* curl) {
+json HttpsClient::perform_request(CURL* curl) {
     CURLcode res;
     long response_code = 0;
     std::string readBuffer;
@@ -139,7 +131,7 @@ json perform_request(CURL* curl) {
 }
 
 // Function to make an HTTP request
-json make_http_request(HttpRequestType request_type, const std::string& url,
+json HttpsClient::make_http_request(HttpRequestType request_type, const std::string& url,
                        const std::map<std::string, std::string>& query_params = {},
                        const json& body = nullptr,
                        const std::map<std::string, std::string>& headers = {}) {
