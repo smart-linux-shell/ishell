@@ -18,7 +18,7 @@ void assistant() {
     using_history();
     manager.get_agency_url();
 
-    BookmarkManager bookmark_manager;
+    BookmarkManager bookmark_manager(&manager);
     bookmark_manager.load_bookmarks("local/bookmarks.json");
 
     while (1) {

@@ -19,7 +19,7 @@ TEST_SOURCES := $(patsubst %, test/%, $(TEST_SOURCES))
 
 INCLUDE := -Iinclude
 
-CXXFLAGS := $(FLAGS) -std=c++17
+CXXFLAGS := $(FLAGS) -std=c++17 -g
 
 Cxx := g++
 
