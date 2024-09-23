@@ -161,3 +161,34 @@ TEST_F(BookmarkTest, Help_DisplaysErrorWhenFileNotFound) {
     // assert
     EXPECT_EQ(error_stream.str(), "Error: Could not find the documentation.\n");
 }
+
+// Test case: Correctly parses valid bookmark command with index and alias.
+TEST_F(BookmarkTest, TryParseBookmarkCommand_ValidWithIndexAndAlias) {
+    // act
+    std::string cmd; int index; std::string alias;
+    bool result = mock_bookmark_manager.try_parse_bookmark_command("bookmark 2 alias1", cmd, index, alias);
+    // assert
+    EXPECT_TRUE(result);
+    EXPECT_EQ(cmd, "bookmark");
+    EXPECT_EQ(index, 2);
+    EXPECT_EQ(alias, "alias1");
+}
+
+// Test case: Correctly parses valid bookmark command with alias only.
+TEST_F(BookmarkTest, TryParseBookmarkCommand_ValidWithAliasOnly) {
+    // act
+    std::string cmd; int index; std::string alias;
+    bool result = mock_bookmark_manager.try_parse_bookmark_command("bookmark alias2", cmd, index, alias);
+    // assert
+    EXPECT_TRUE(result);
+    EXPECT_EQ(cmd, "bookmark");
+    EXPECT_EQ(index, 1);  // default index
+    EXPECT_EQ(alias, "alias2");
+}
+
+// Test case: Fails to parse invalid bookmark command.
+TEST_F(BookmarkTest, TryParseBookmarkCommand_InvalidCommand) {
+    std::string cmd; int index; std::string alias;
+    bool result = mock_bookmark_manager.try_parse_bookmark_command("invalid_command alias3", cmd, index, alias);
+    EXPECT_FALSE(result);
+}

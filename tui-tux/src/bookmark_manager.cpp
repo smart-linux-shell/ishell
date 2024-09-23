@@ -183,13 +183,13 @@ void BookmarkManager::help(std::string manual_filename) {
 bool BookmarkManager::try_parse_bookmark_command(const std::string &input_str, std::string &cmd, int &index, std::string &alias) {
     std::istringstream iss(input_str);
     // try to parse "bookmark <index> <alias>"
-    if (iss >> cmd >> index >> alias) {
+    if (iss >> cmd >> index >> alias && cmd == "bookmark") {
         return true;
     }
     // if parsing fails, try to parse "bookmark <alias>"
     iss.clear();
     iss.str(input_str);
-    if (iss >> cmd >> alias) {
+    if (iss >> cmd >> alias && cmd == "bookmark") {
         index = 1; // default index if not provided
         return true;
     }
