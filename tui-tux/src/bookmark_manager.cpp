@@ -12,6 +12,8 @@
 
 using json = nlohmann::json;
 
+#define HELP_FILENAME "manuals/bookmark.txt"
+
 BookmarkManager::BookmarkManager(AgencyManager* agencyManager) {
   agency_manager = agencyManager;
 }
@@ -124,13 +126,13 @@ std::string BookmarkManager::find_result_in_session_history(const std::string &q
 void BookmarkManager::bookmark(int index, const std::string &alias, std::vector<std::pair<std::string, std::string>> &session_history) {
    // bookmark already exists
     if (bookmarks.find(alias) != bookmarks.end()) {
-        std::cout << "Error: Bookmark '" << alias << "' already exists.\n";
+        std::cerr << "Error: Bookmark '" << alias << "' already exists.\n";
         return;
     }
     // find query
     std::string query = get_query_from_history(index);
     if (query.empty()) {
-        std::cout << "Error: Invalid history index.\n";
+        std::cerr << "Error: Invalid history index.\n";
         return;
     }
     // find result
@@ -149,7 +151,7 @@ void BookmarkManager::remove_bookmark(const std::string &alias) {
         bookmarks.erase(it);
         std::cout << "Removed bookmark '" << alias << "'.\n";
     } else {
-        std::cout << "Error: Bookmark '" << alias << "' not found.\n";
+        std::cerr << "Error: Bookmark '" << alias << "' not found.\n";
     }
 }
 
@@ -165,8 +167,8 @@ void BookmarkManager::list_bookmarks() const {
     }
 }
 
-void BookmarkManager::help() {
-    std::ifstream file("manuals/bookmark.txt");
+void BookmarkManager::help(std::string manual_filename) {
+    std::ifstream file(manual_filename);
     if (!file.is_open()) {
         std::cerr << "Error: Could not find the documentation.\n";
         return;
@@ -200,7 +202,7 @@ void BookmarkManager::handle_bookmark_command(const std::string &input_str, std:
         return;
     }
     else if (is_help_flag(input_str)) {
-        help();
+        help(HELP_FILENAME);
         return;
     }
 
@@ -211,6 +213,6 @@ void BookmarkManager::handle_bookmark_command(const std::string &input_str, std:
         bookmark(index, alias, session_history);
     } else {
         std::cerr << "Error: Invalid bookmark command format.\n";
-        help();
+        help(HELP_FILENAME);
     }
 }

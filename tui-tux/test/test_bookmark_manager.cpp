@@ -2,6 +2,8 @@
 #include <gmock/gmock.h>
 #include <vector>
 #include <string>
+#include <sstream>
+#include <fstream>
 #include <unordered_map>
 #include "../include/bookmark_manager.hpp"
 
@@ -25,13 +27,16 @@ protected:
     MockAgencyManager mock_agency_manager;
     MockBookmarkManager mock_bookmark_manager;
     std::vector<std::pair<std::string, std::string>> session_history;
+
     std::stringstream output_stream;
+    std::stringstream error_stream;
 
     BookmarkTest() : mock_bookmark_manager(&mock_agency_manager) {}
 
     void SetUp() override {
         // redirect std::cout to output_stream
         std::cout.rdbuf(output_stream.rdbuf());
+        std::cerr.rdbuf(error_stream.rdbuf());
 
         mock_bookmark_manager.bookmarks.clear();
         mock_bookmark_manager.bookmarks["alias1"] = {"query1", "result1"};
@@ -43,6 +48,7 @@ protected:
     void TearDown() override {
         // reset the std::cout buffer back to default
         std::cout.rdbuf(nullptr);
+        std::cerr.rdbuf(nullptr);
     }
 };
 
@@ -66,7 +72,7 @@ TEST_F(BookmarkTest, Bookmark_AliasAlreadyExists) {
     // act
     mock_bookmark_manager.bookmark(1, "alias1", session_history);
     // assert
-    EXPECT_EQ(output_stream.str(), "Error: Bookmark 'alias1' already exists.\n");
+    EXPECT_EQ(error_stream.str(), "Error: Bookmark 'alias1' already exists.\n");
     EXPECT_EQ(mock_bookmark_manager.bookmarks.size(), MOCK_BOOKMARS_SIZE + 0);
 }
 
@@ -78,7 +84,7 @@ TEST_F(BookmarkTest, Bookmark_InvalidHistoryIndex) {
     // act
     mock_bookmark_manager.bookmark(99, "alias2", session_history);
     // assert
-    EXPECT_EQ(output_stream.str(), "Error: Invalid history index.\n");
+    EXPECT_EQ(error_stream.str(), "Error: Invalid history index.\n");
     EXPECT_EQ(mock_bookmark_manager.bookmarks.size(), MOCK_BOOKMARS_SIZE + 0);
 }
 
@@ -114,6 +120,44 @@ TEST_F(BookmarkTest, RemoveBookmark_ErrorWhenAliasNotFound) {
     // act
     mock_bookmark_manager.remove_bookmark("alias3");
     // assert
-    EXPECT_EQ(output_stream.str(), "Error: Bookmark 'alias3' not found.\n");
+    EXPECT_EQ(error_stream.str(), "Error: Bookmark 'alias3' not found.\n");
     ASSERT_EQ(mock_bookmark_manager.bookmarks.size(), MOCK_BOOKMARS_SIZE - 0);
+}
+
+// Test case: Lists all existing bookmarks in the correct format.
+TEST_F(BookmarkTest, ListBookmarks_ListsAllExistingBookmarksCorrectly) {
+    // act
+    mock_bookmark_manager.list_bookmarks();
+    // assert
+    std::string expected_output =
+        "BOOKMARK            QUERY                                             \n"
+        "alias1              query1                                            \n";
+    EXPECT_EQ(output_stream.str(), expected_output);
+}
+
+// Test case: Successfully loads and displays the help documentation.
+TEST_F(BookmarkTest, Help_DisplaysHelpDocumentationSuccessfully) {
+    // arrange a temp help file
+    const std::string temp_help_filepath = "manuals/temp_bookmark.txt";
+    std::ofstream temp_help_file(temp_help_filepath);
+    temp_help_file << "This is a help documentation line.\n"
+                      "Another line of help documentation.\n";
+    temp_help_file.close();
+    // act
+    mock_bookmark_manager.help(temp_help_filepath);
+    // assert
+    std::string expected_output =
+        "This is a help documentation line.\n"
+        "Another line of help documentation.\n";
+    EXPECT_EQ(output_stream.str(), expected_output);
+    // cleanup
+    std::remove(temp_help_filepath.c_str());
+}
+
+// Test case: Displays error if the documentation file cannot be found.
+TEST_F(BookmarkTest, Help_DisplaysErrorWhenFileNotFound) {
+    // act
+    mock_bookmark_manager.help("manuals/temp_bookmark.txt");
+    // assert
+    EXPECT_EQ(error_stream.str(), "Error: Could not find the documentation.\n");
 }

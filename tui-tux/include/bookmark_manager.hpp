@@ -40,7 +40,7 @@ public:
     virtual std::string get_query_from_history(int index);
     virtual std::string find_result_in_session_history(const std::string &query, std::vector<std::pair<std::string, std::string>> &session_history);
     virtual bool try_parse_bookmark_command(const std::string &input_str, std::string &cmd, int &index, std::string &alias);
-    virtual void help();
+    virtual void help(std::string manual_filename);
 };
 
 #endif // BOOKMARKS_HPP
