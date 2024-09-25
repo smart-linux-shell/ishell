@@ -12,8 +12,6 @@
 
 using json = nlohmann::json;
 
-HttpsClient https_client;
-
 // Function to get Linux distribution
 std::string AgencyRequestWrapper::get_linux_distro() {
     struct utsname buffer;
@@ -85,7 +83,7 @@ json AgencyRequestWrapper::send_request_to_agent_server(const std::string& url, 
         {"Content-Type", "application/json"}
     };
 
-    json response = https_client.make_http_request(HttpRequestType::POST, url, {}, request_body, headers);
+    json response = make_http_request(HttpRequestType::POST, url, {}, request_body, headers);
 
     return response;
 }
@@ -107,4 +105,12 @@ std::string AgencyRequestWrapper::ask_agent(const std::string& url, const std::s
         std::cerr << "\"content\" field not found in response body" << std::endl;
         return "";
     }
+}
+
+json AgencyRequestWrapper::make_http_request(HttpRequestType request_type, const std::string& url,
+                       const std::map<std::string, std::string>& query_params = {},
+                       const json& body = nullptr,
+                       const std::map<std::string, std::string>& headers = {}) {
+    HttpsClient https_client;
+    return https_client.make_http_request(request_type, url, query_params, body, headers);
 }
