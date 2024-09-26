@@ -4,11 +4,9 @@
 #include "../include/agency_request_wrapper.hpp"
 #include "../include/https_client.hpp"
 
-#include <iostream>
-
 using namespace testing;
 
-class MockAgencyRequestWrapper : public AgencyRequestWrapper {
+class MockAgencyRequestWrapper1 : public AgencyRequestWrapper {
 public:
     MOCK_METHOD(json, make_http_request, (HttpRequestType request_type, const std::string& url,
                        (const std::map<std::string, std::string>&) query_params,
@@ -21,13 +19,20 @@ public:
     MOCK_METHOD(std::string, get_ssh_user, (), (override));
 };
 
-class AgencyRequestWrapperTest : public ::testing::Test {
-protected:
-    MockAgencyRequestWrapper mock_agency_request_wrapper;
+class MockAgencyRequestWrapper2 : public AgencyRequestWrapper {
+public:
+    MOCK_METHOD(json, make_http_request, (HttpRequestType request_type, const std::string& url,
+                       (const std::map<std::string, std::string>&) query_params,
+                       const json& body,
+                       (const std::map<std::string, std::string>&) headers), (override));
+    MOCK_METHOD(char *, getenv, (const char *), (override));
 };
 
-// Test case: Successfully creates a request with the correct data fields (distro, installed_packages, query, ssh_ip, ssh_port, ssh_user).
-TEST_F(AgencyRequestWrapperTest, CorrectRequestData) {
+class AgencyRequestWrapperTest : public Test {
+protected:
+    MockAgencyRequestWrapper1 mock_agency_request_wrapper1;
+    MockAgencyRequestWrapper2 mock_agency_request_wrapper2;
+
     std::string distro = "Test Distro";
     std::vector<std::string> packages = {"Test Package"};
     std::string ssh_ip = "0.0.0.0";
@@ -36,16 +41,19 @@ TEST_F(AgencyRequestWrapperTest, CorrectRequestData) {
 
     std::string url = "0.0.0.1";
     std::string query = "Test Query";
+};
 
-    EXPECT_CALL(mock_agency_request_wrapper, get_linux_distro())
+// Test case: Successfully creates a request with the correct data fields (distro, installed_packages, query, ssh_ip, ssh_port, ssh_user).
+TEST_F(AgencyRequestWrapperTest, CorrectRequestData) {
+    EXPECT_CALL(mock_agency_request_wrapper1, get_linux_distro())
         .WillOnce(Return(distro));
-    EXPECT_CALL(mock_agency_request_wrapper, get_installed_packages())
+    EXPECT_CALL(mock_agency_request_wrapper1, get_installed_packages())
         .WillOnce(Return(packages));
-    EXPECT_CALL(mock_agency_request_wrapper, get_ssh_ip())
+    EXPECT_CALL(mock_agency_request_wrapper1, get_ssh_ip())
         .WillOnce(Return(ssh_ip));
-    EXPECT_CALL(mock_agency_request_wrapper, get_ssh_port())
+    EXPECT_CALL(mock_agency_request_wrapper1, get_ssh_port())
         .WillOnce(Return(ssh_port));
-    EXPECT_CALL(mock_agency_request_wrapper, get_ssh_user())
+    EXPECT_CALL(mock_agency_request_wrapper1, get_ssh_user())
         .WillOnce(Return(ssh_user));
 
     json request_body = {
@@ -56,6 +64,75 @@ TEST_F(AgencyRequestWrapperTest, CorrectRequestData) {
         {"ssh_port", ssh_port},
         {"ssh_user", ssh_user}
     };
+
+    json body = {
+        {"content", "Test content"}
+    };
+
+    json response = {
+        {"status_code", "200"},
+        {"headers", {}},
+        {"body", body}
+    };
+        
+    EXPECT_CALL(mock_agency_request_wrapper1, make_http_request(HttpRequestType::POST, url, _, request_body, _))
+        .WillOnce(Return(response));
+
+    // Call
+    mock_agency_request_wrapper1.send_request_to_agent_server(url, query);
+};
+
+// Test case: Handles the case where one or more fields are empty.
+TEST_F(AgencyRequestWrapperTest, EmptyFields) {
+    EXPECT_CALL(mock_agency_request_wrapper2, getenv(StrEq("SSH_CLIENT")))
+        .WillOnce(Return(nullptr));
+    
+    EXPECT_CALL(mock_agency_request_wrapper2, getenv(StrEq("SSH_PORT")))
+        .WillOnce(Return(nullptr));
+
+    EXPECT_CALL(mock_agency_request_wrapper2, getenv(StrEq("USER")))
+        .WillOnce(Return(nullptr));
+
+    json request;
+
+    json body = {
+        {"content", "Test content"}
+    };
+
+    json response = {
+        {"status_code", "200"},
+        {"headers", {}},
+        {"body", body}
+    };
+
+    EXPECT_CALL(mock_agency_request_wrapper2, make_http_request(HttpRequestType::POST, url, _, _, _))
+        .WillOnce(DoAll(SaveArg<3>(&request), Return(response)));
+
+    // Call
+    mock_agency_request_wrapper2.send_request_to_agent_server(url, query);
+
+    // Assert
+    EXPECT_TRUE(request.contains("ssh_ip"));
+    EXPECT_TRUE(request.contains("ssh_ip"));
+    EXPECT_TRUE(request.contains("ssh_ip"));
+
+    EXPECT_EQ(request["ssh_ip"], "Unknown");
+    EXPECT_EQ(request["ssh_user"], "Unknown");
+    EXPECT_EQ(request["ssh_port"], 22);
+}
+
+// Test case: Makes a POST request with the correct headers.
+TEST_F(AgencyRequestWrapperTest, CorrectHeaders) {
+    EXPECT_CALL(mock_agency_request_wrapper1, get_linux_distro())
+        .WillOnce(Return(distro));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_installed_packages())
+        .WillOnce(Return(packages));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_ssh_ip())
+        .WillOnce(Return(ssh_ip));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_ssh_port())
+        .WillOnce(Return(ssh_port));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_ssh_user())
+        .WillOnce(Return(ssh_user));
 
     std::map<std::string, std::string> headers = {
         {"Content-Type", "application/json"}
@@ -71,12 +148,116 @@ TEST_F(AgencyRequestWrapperTest, CorrectRequestData) {
         {"body", body}
     };
     
-    // Empty
-    std::map<std::string, std::string> query_params;
-    
-    EXPECT_CALL(mock_agency_request_wrapper, make_http_request(HttpRequestType::POST, url, query_params, request_body, headers))
-        .WillRepeatedly(Return(response));
+    EXPECT_CALL(mock_agency_request_wrapper1, make_http_request(HttpRequestType::POST, url, _, _, headers))
+        .WillOnce(Return(response));
 
     // Call
-    mock_agency_request_wrapper.ask_agent(url, query);
+    mock_agency_request_wrapper1.send_request_to_agent_server(url, query);
+}
+
+// Test case: Successfully retrieves content from the server response when the request is successful.
+TEST_F(AgencyRequestWrapperTest, SuccessfulRequest) {
+    EXPECT_CALL(mock_agency_request_wrapper1, get_linux_distro())
+        .WillOnce(Return(distro));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_installed_packages())
+        .WillOnce(Return(packages));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_ssh_ip())
+        .WillOnce(Return(ssh_ip));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_ssh_port())
+        .WillOnce(Return(ssh_port));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_ssh_user())
+        .WillOnce(Return(ssh_user));
+
+    std::string response_content = "Test content";
+
+    json body = {
+        {"content", response_content}
+    };
+
+    json response = {
+        {"status_code", "200"},
+        {"headers", {}},
+        {"body", body}
+    };
+
+    EXPECT_CALL(mock_agency_request_wrapper1, make_http_request(_, _, _, _, _))
+        .WillOnce(Return(response));
+
+    // Call
+    std::string agent_response = mock_agency_request_wrapper1.ask_agent(url, query);
+
+    // Assert
+    EXPECT_EQ(agent_response, response_content);
+};
+
+// Test case: Handles errors when the server returns an error field in the response.
+TEST_F(AgencyRequestWrapperTest, ResponseError) {
+    EXPECT_CALL(mock_agency_request_wrapper1, get_linux_distro())
+        .WillOnce(Return(distro));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_installed_packages())
+        .WillOnce(Return(packages));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_ssh_ip())
+        .WillOnce(Return(ssh_ip));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_ssh_port())
+        .WillOnce(Return(ssh_port));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_ssh_user())
+        .WillOnce(Return(ssh_user));
+
+    std::string response_error = "Test error";
+
+    json response = {
+        {"status_code", "200"},
+        {"headers", {}},
+        {"error", response_error}
+    };
+
+    EXPECT_CALL(mock_agency_request_wrapper1, make_http_request(_, _, _, _, _))
+        .WillOnce(Return(response));
+
+    // Capture stderr
+    internal::CaptureStderr();
+
+    // Call
+    mock_agency_request_wrapper1.ask_agent(url, query);
+
+    std::string result_err = internal::GetCapturedStderr();
+
+    // Assert
+    EXPECT_TRUE(result_err.find(response_error) != std::string::npos);
+};
+
+// Test case: Returns an error message if the content field is not found in the server response.
+TEST_F(AgencyRequestWrapperTest, ResponseNoContent) {
+    EXPECT_CALL(mock_agency_request_wrapper1, get_linux_distro())
+        .WillOnce(Return(distro));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_installed_packages())
+        .WillOnce(Return(packages));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_ssh_ip())
+        .WillOnce(Return(ssh_ip));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_ssh_port())
+        .WillOnce(Return(ssh_port));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_ssh_user())
+        .WillOnce(Return(ssh_user));
+
+    json response_body = {};            // Empty (no content)
+
+    json response = {
+        {"status_code", "200"},
+        {"headers", {}},
+        {"body", response_body}
+    };
+
+    EXPECT_CALL(mock_agency_request_wrapper1, make_http_request(_, _, _, _, _))
+        .WillOnce(Return(response));
+
+    // Capture stderr
+    internal::CaptureStderr();
+
+    // Call
+    mock_agency_request_wrapper1.ask_agent(url, query);
+
+    std::string result_err = internal::GetCapturedStderr();
+
+    // Assert
+    EXPECT_TRUE(result_err.find("content") != std::string::npos);
 };

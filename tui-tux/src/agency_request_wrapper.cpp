@@ -38,7 +38,7 @@ std::vector<std::string> AgencyRequestWrapper::get_installed_packages() {
 
 // Function to get SSH IP, port, and user from environment variables (? might change ?)
 std::string AgencyRequestWrapper::get_ssh_ip() {
-    char* ssh_ip = std::getenv("SSH_CLIENT");
+    char* ssh_ip = getenv("SSH_CLIENT");
     if (ssh_ip) {
         std::string ssh_ip_str(ssh_ip);
         return ssh_ip_str.substr(0, ssh_ip_str.find(' '));
@@ -47,7 +47,7 @@ std::string AgencyRequestWrapper::get_ssh_ip() {
 }
 
 int AgencyRequestWrapper::get_ssh_port() {
-    char* ssh_port = std::getenv("SSH_PORT");
+    char* ssh_port = getenv("SSH_PORT");
     if (ssh_port) {
         return std::stoi(ssh_port);
     }
@@ -55,7 +55,7 @@ int AgencyRequestWrapper::get_ssh_port() {
 }
 
 std::string AgencyRequestWrapper::get_ssh_user() {
-    char* ssh_user = std::getenv("USER");
+    char* ssh_user = getenv("USER");
     if (ssh_user) {
         return std::string(ssh_user);
     }
@@ -113,4 +113,8 @@ json AgencyRequestWrapper::make_http_request(HttpRequestType request_type, const
                        const std::map<std::string, std::string>& headers = {}) {
     HttpsClient https_client;
     return https_client.make_http_request(request_type, url, query_params, body, headers);
+}
+
+char *AgencyRequestWrapper::getenv(const char *key) {
+    return std::getenv(key);
 }

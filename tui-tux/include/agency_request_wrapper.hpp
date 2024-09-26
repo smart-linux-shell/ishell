@@ -21,6 +21,7 @@ public:
                         const std::map<std::string, std::string>& query_params,
                         const json& body,
                         const std::map<std::string, std::string>& headers);
+    virtual char *getenv(const char *key);
 };
 
 #endif // AGENCY_REQUEST_WRAPPER_HPP

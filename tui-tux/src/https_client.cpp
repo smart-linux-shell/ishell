@@ -114,7 +114,7 @@ json HttpsClient::perform_request(CURL* curl) {
         {"status_code", response_code},
         {"headers", response_headers},
         {"body", nullptr}
-    };
+    };  
 
     if (res != CURLE_OK) {
         response["error"] = curl_easy_strerror(res);
@@ -158,4 +158,8 @@ json HttpsClient::make_http_request(HttpRequestType request_type, const std::str
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
 
     return perform_request(curl);
+}
+
+CURL *HttpsClient::curl_easy_init() {
+    return ::curl_easy_init();
 }
