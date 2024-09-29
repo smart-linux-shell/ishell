@@ -163,3 +163,7 @@ json HttpsClient::make_http_request(HttpRequestType request_type, const std::str
 CURL *HttpsClient::curl_easy_init() {
     return ::curl_easy_init();
 }
+
+CURLcode HttpsClient::curl_easy_perform(CURL *curl) {
+    return ::curl_easy_perform(curl);
+}

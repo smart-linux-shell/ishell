@@ -29,9 +29,10 @@ public:
     virtual void set_request_type(CURL* curl, HttpRequestType request_type);
     void add_request_body(CURL* curl, HttpRequestType request_type, const json& body, std::string& jsonData);
     void add_request_headers(CURL* curl, const std::map<std::string, std::string>& headers);
-    void set_response_callbacks(CURL* curl, std::string& readBuffer, std::map<std::string, std::string>& response_headers);
+    virtual void set_response_callbacks(CURL* curl, std::string& readBuffer, std::map<std::string, std::string>& response_headers);
     virtual json perform_request(CURL* curl);
     virtual CURL *curl_easy_init();
+    virtual CURLcode curl_easy_perform(CURL *curl);
 };
 
 #endif // HTTPS_CLIENT_HPP

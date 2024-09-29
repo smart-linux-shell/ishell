@@ -261,3 +261,36 @@ TEST_F(AgencyRequestWrapperTest, ResponseNoContent) {
     // Assert
     EXPECT_TRUE(result_err.find("content") != std::string::npos);
 };
+
+
+// Test case: Returns a valid JSON format of response from the agent server.
+TEST_F(AgencyRequestWrapperTest, ValidJSON) {
+    EXPECT_CALL(mock_agency_request_wrapper1, get_linux_distro())
+        .WillOnce(Return(distro));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_installed_packages())
+        .WillOnce(Return(packages));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_ssh_ip())
+        .WillOnce(Return(ssh_ip));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_ssh_port())
+        .WillOnce(Return(ssh_port));
+    EXPECT_CALL(mock_agency_request_wrapper1, get_ssh_user())
+        .WillOnce(Return(ssh_user));
+
+    json response_body = {
+        {"content", "Test JSON"}
+    };
+
+    json response = {
+        {"status_code", "200"},
+        {"headers", {}},
+        {"body", response_body}
+    };
+
+    EXPECT_CALL(mock_agency_request_wrapper1, make_http_request(_, _, _, _, _))
+        .WillOnce(Return(response));
+
+    // Call
+    json result = mock_agency_request_wrapper1.send_request_to_agent_server(url, query);
+
+    EXPECT_TRUE(result.contains("body") && result["body"].contains("content") && result["body"]["content"] == "Test JSON");
+};
