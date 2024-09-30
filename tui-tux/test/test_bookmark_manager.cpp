@@ -41,8 +41,8 @@ protected:
         mock_bookmark_manager.bookmarks.clear();
         mock_bookmark_manager.bookmarks["alias1"] = {"query1", "result1"};
         session_history.clear();
+        session_history.push_back({"query1", "result1"});
         session_history.push_back({"query2", "result2"});
-        session_history.push_back({"query3", "result3"});
     }
 
     void TearDown() override {
@@ -56,14 +56,14 @@ protected:
 TEST_F(BookmarkTest, Bookmark_SuccessfullyAddsBookmark) {
     // setup mock expectations
     EXPECT_CALL(mock_bookmark_manager, get_query_from_history(1))
-        .WillOnce(::testing::Return("query2"));
-    EXPECT_CALL(mock_bookmark_manager, find_result_in_session_history("query2", ::testing::_))
-        .WillOnce(::testing::Return("result2"));
+        .WillOnce(::testing::Return("query1"));
+    EXPECT_CALL(mock_bookmark_manager, find_result_in_session_history("query1", ::testing::_))
+        .WillOnce(::testing::Return("result1"));
     // act
-    mock_bookmark_manager.bookmark(1, "alias2", session_history);
+    mock_bookmark_manager.bookmark(1, "alias", session_history);
     // assert
-    EXPECT_EQ(mock_bookmark_manager.bookmarks["alias2"].first, "query2");
-    EXPECT_EQ(mock_bookmark_manager.bookmarks["alias2"].second, "result2");
+    EXPECT_EQ(mock_bookmark_manager.bookmarks["alias1"].first, "query1");
+    EXPECT_EQ(mock_bookmark_manager.bookmarks["alias1"].second, "result1");
     ASSERT_EQ(mock_bookmark_manager.bookmarks.size(), MOCK_BOOKMARS_SIZE + 1);
 }
 
@@ -166,29 +166,73 @@ TEST_F(BookmarkTest, Help_DisplaysErrorWhenFileNotFound) {
 TEST_F(BookmarkTest, TryParseBookmarkCommand_ValidWithIndexAndAlias) {
     // act
     std::string cmd; int index; std::string alias;
-    bool result = mock_bookmark_manager.try_parse_bookmark_command("bookmark 2 alias1", cmd, index, alias);
+    bool result = mock_bookmark_manager.try_parse_bookmark_command("bookmark 2 alias", cmd, index, alias);
     // assert
     EXPECT_TRUE(result);
     EXPECT_EQ(cmd, "bookmark");
     EXPECT_EQ(index, 2);
-    EXPECT_EQ(alias, "alias1");
+    EXPECT_EQ(alias, "alias");
 }
 
 // Test case: Correctly parses valid bookmark command with alias only.
 TEST_F(BookmarkTest, TryParseBookmarkCommand_ValidWithAliasOnly) {
     // act
     std::string cmd; int index; std::string alias;
-    bool result = mock_bookmark_manager.try_parse_bookmark_command("bookmark alias2", cmd, index, alias);
+    bool result = mock_bookmark_manager.try_parse_bookmark_command("bookmark alias", cmd, index, alias);
     // assert
     EXPECT_TRUE(result);
     EXPECT_EQ(cmd, "bookmark");
     EXPECT_EQ(index, 1);  // default index
-    EXPECT_EQ(alias, "alias2");
+    EXPECT_EQ(alias, "alias");
 }
 
 // Test case: Fails to parse invalid bookmark command.
 TEST_F(BookmarkTest, TryParseBookmarkCommand_InvalidCommand) {
+    // act
     std::string cmd; int index; std::string alias;
-    bool result = mock_bookmark_manager.try_parse_bookmark_command("invalid_command alias3", cmd, index, alias);
+    bool result = mock_bookmark_manager.try_parse_bookmark_command("invalid_command alias", cmd, index, alias);
+    // assert
     EXPECT_FALSE(result);
+}
+
+// Test case: Correctly handles list flag and lists bookmarks.
+TEST_F(BookmarkTest, HandleBookmarkCommand_HandlesListFlag) {
+    // act
+    mock_bookmark_manager.handle_bookmark_command("bookmark --list", session_history);
+    // assert
+    std::string expected_output =
+        "BOOKMARK            QUERY                                             \n"
+        "alias1              query1                                            \n";
+    EXPECT_EQ(output_stream.str(), expected_output);
+}
+
+// Test case: Correctly handles help flag and displays help.
+TEST_F(BookmarkTest, HandleBookmarkCommand_DisplaysHelp) {
+    // act
+    mock_bookmark_manager.handle_bookmark_command("bookmark --help", session_history);
+    // assert
+    EXPECT_NE(error_stream.str(), "Error: Could not find the documentation.");
+}
+
+// Test case: Correctly handles valid bookmark command and bookmarks query.
+TEST_F(BookmarkTest, HandleBookmarkCommand_HandlesValidBookmarkCommand) {
+    // setup mock expectations
+    EXPECT_CALL(mock_bookmark_manager, get_query_from_history(1))
+        .WillOnce(::testing::Return("query1"));
+    EXPECT_CALL(mock_bookmark_manager, find_result_in_session_history("query1", ::testing::_))
+        .WillOnce(::testing::Return("result1"));
+    // act
+    mock_bookmark_manager.handle_bookmark_command("bookmark 1 alias", session_history);
+    // assert
+    EXPECT_EQ(mock_bookmark_manager.bookmarks["alias"].first, "query1");
+    EXPECT_EQ(mock_bookmark_manager.bookmarks["alias"].second, "result1");
+    ASSERT_EQ(mock_bookmark_manager.bookmarks.size(), MOCK_BOOKMARS_SIZE + 1);
+}
+
+// Test case: Displays error for invalid bookmark command format.
+TEST_F(BookmarkTest, HandleBookmarkCommand_DisplaysErrorForInvalidCommand) {
+    // act
+    mock_bookmark_manager.handle_bookmark_command("invalid command", session_history);
+    // assert
+    EXPECT_EQ(error_stream.str(), "Error: Invalid bookmark command format.\n");
 }
