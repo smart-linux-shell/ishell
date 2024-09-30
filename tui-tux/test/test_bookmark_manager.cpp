@@ -236,3 +236,107 @@ TEST_F(BookmarkTest, HandleBookmarkCommand_DisplaysErrorForInvalidCommand) {
     // assert
     EXPECT_EQ(error_stream.str(), "Error: Invalid bookmark command format.\n");
 }
+
+
+// Test case: Successfully creates a new bookmark file.
+TEST_F(BookmarkTest, CreateBookmarksFile_SuccessfullyCreatesNewFile) {
+    // arrange
+    const std::string test_filepath = "bookmarks_test.json";
+    // act
+    bool result = mock_bookmark_manager.create_bookmarks_file(test_filepath);
+    // assert
+    EXPECT_TRUE(result);
+    std::ifstream created_file(test_filepath);
+    EXPECT_TRUE(created_file.good());
+    std::string file_content((std::istreambuf_iterator<char>(created_file)),
+                              std::istreambuf_iterator<char>()); // empty json file
+    EXPECT_EQ(file_content, "[]");
+    // cleanup
+    std::remove(test_filepath.c_str());
+}
+
+// Test case: Fails to create a new bookmark file (invalid file path).
+TEST_F(BookmarkTest, CreateBookmarksFile_FailsToCreateFileWithInvalidPath) {
+    // act
+    bool result = mock_bookmark_manager.create_bookmarks_file("/invalid/path/bookmarks_test.json");
+    // assert
+    EXPECT_FALSE(result);
+    EXPECT_EQ(error_stream.str(), "Error creating file: /invalid/path/bookmarks_test.json\n");
+}
+
+// Test case: Successfully parses valid JSON object into bookmarks.
+TEST_F(BookmarkTest, ParseBookmarkJson_SuccessfullyParsesValidJson) {
+    // arrange
+    json valid_json = {
+        {"alias", "alias1"},
+        {"query", "query1"},
+        {"result", "result1"}
+    };
+    // act
+    mock_bookmark_manager.parse_bookmark_json(valid_json);
+    // assert
+    EXPECT_EQ(mock_bookmark_manager.bookmarks["alias1"].first, "query1");
+    EXPECT_EQ(mock_bookmark_manager.bookmarks["alias1"].second, "result1");
+}
+
+// Test case: Fails to parse invalid JSON object (missing fields).
+TEST_F(BookmarkTest, ParseBookmarkJson_FailsToParseInvalidJson) {
+    // arrange (missing result field)
+    json invalid_json = {
+        {"alias", "alias1"},
+        {"query", "query1"}
+
+    };
+    // act & assert
+    try {
+        mock_bookmark_manager.parse_bookmark_json(invalid_json);
+        FAIL() << "Expected exception due to missing fields in JSON.";
+    } catch (const nlohmann::json::out_of_range& e) {
+        EXPECT_STREQ(e.what(), "[json.exception.out_of_range.403] key 'result' not found");
+    } catch (...) {
+        FAIL() << "Expected nlohmann::json::out_of_range exception, but got a different type.";
+    }
+    EXPECT_EQ(mock_bookmark_manager.bookmarks.size(), MOCK_BOOKMARS_SIZE); // ensure no new bookmarks were added
+}
+
+// Test case: Successfully loads bookmarks from existing file.
+TEST_F(BookmarkTest, LoadBookmarks_SucessfullyLoadsBookmarks) {
+    // arrange
+    std::string filename = "bookmarks.json";
+    std::ofstream empty_file(filename);
+    empty_file << "[{\"alias\": \"alias\", \"query\": \"query\", \"result\": \"result\"}]";
+    empty_file.close();
+    // act
+    mock_bookmark_manager.load_bookmarks(filename);
+    // assert
+    EXPECT_EQ(mock_bookmark_manager.bookmarks.size(), MOCK_BOOKMARS_SIZE + 1);
+    // cleanup
+    std::remove(filename.c_str());
+}
+
+// Test case: Fails to load bookmarks if the file does not exist, and creates a new file.
+TEST_F(BookmarkTest, LoadBookmarks_CreatesNewFileIfNotExist) {
+    // arrange
+    std::string filename = "non_existing_bookmarks.json";
+    // act
+    mock_bookmark_manager.load_bookmarks(filename);
+    // assert
+    EXPECT_EQ(mock_bookmark_manager.bookmarks.size(), MOCK_BOOKMARS_SIZE);
+    // cleanup
+    std::remove(filename.c_str());
+}
+
+// Test case: Empty bookmarks file is handled correctly.
+TEST_F(BookmarkTest, LoadBookmarks_HandlesEmptyFileCorrectly) {
+    // arrange
+    std::string filename = "bookmarks.json";
+    std::ofstream empty_file(filename);
+    empty_file << "[]";
+    empty_file.close();
+    // act
+    mock_bookmark_manager.load_bookmarks(filename);
+    // assert
+    EXPECT_EQ(mock_bookmark_manager.bookmarks.size(), MOCK_BOOKMARS_SIZE);
+    // cleanup
+    std::remove(filename.c_str());
+}
