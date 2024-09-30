@@ -241,18 +241,18 @@ TEST_F(BookmarkTest, HandleBookmarkCommand_DisplaysErrorForInvalidCommand) {
 // Test case: Successfully creates a new bookmark file.
 TEST_F(BookmarkTest, CreateBookmarksFile_SuccessfullyCreatesNewFile) {
     // arrange
-    const std::string test_filepath = "bookmarks_test.json";
+    const std::string filename = "bookmarks_test.json";
     // act
-    bool result = mock_bookmark_manager.create_bookmarks_file(test_filepath);
+    bool result = mock_bookmark_manager.create_bookmarks_file(filename);
     // assert
     EXPECT_TRUE(result);
-    std::ifstream created_file(test_filepath);
+    std::ifstream created_file(filename);
     EXPECT_TRUE(created_file.good());
     std::string file_content((std::istreambuf_iterator<char>(created_file)),
                               std::istreambuf_iterator<char>()); // empty json file
     EXPECT_EQ(file_content, "[]");
     // cleanup
-    std::remove(test_filepath.c_str());
+    std::remove(filename.c_str());
 }
 
 // Test case: Fails to create a new bookmark file (invalid file path).
@@ -337,6 +337,41 @@ TEST_F(BookmarkTest, LoadBookmarks_HandlesEmptyFileCorrectly) {
     mock_bookmark_manager.load_bookmarks(filename);
     // assert
     EXPECT_EQ(mock_bookmark_manager.bookmarks.size(), MOCK_BOOKMARS_SIZE);
+    // cleanup
+    std::remove(filename.c_str());
+}
+
+// Test case: Successfully saves bookmarks to file.
+TEST_F(BookmarkTest, SaveBookmarks_SuccessfullySavesToFile) {
+    // arrange
+    std::string filename = "bookmarks.json";
+    // act
+    mock_bookmark_manager.save_bookmarks(filename);
+    // assert
+    std::ifstream file(filename);
+    ASSERT_TRUE(file.is_open());
+    json bookmark_json;
+    file >> bookmark_json;
+    file.close();
+    ASSERT_EQ(bookmark_json.size(), MOCK_BOOKMARS_SIZE);
+    EXPECT_EQ(bookmark_json[0]["alias"], "alias1");
+    EXPECT_EQ(bookmark_json[0]["query"], "query1");
+    EXPECT_EQ(bookmark_json[0]["result"], "result1");
+    // cleanup
+    std::remove(filename.c_str());
+}
+
+// Test case: Fails to save bookmarks if the file cannot be opened (read-only file).
+TEST_F(BookmarkTest, SaveBookmarks_FailsToOpenReadOnlyFile) {
+    // arrange
+    std::string filename = "bookmarks.json";
+    std::ofstream file(filename);
+    file.close();
+    chmod(filename.c_str(), 0444);  // make the file read-only
+    // act
+    mock_bookmark_manager.save_bookmarks(filename);
+    // assert
+    EXPECT_TRUE(error_stream.str().find("Error opening file") != std::string::npos);
     // cleanup
     std::remove(filename.c_str());
 }
