@@ -6,12 +6,18 @@
 #include <fstream>
 #include <unordered_map>
 #include "../include/bookmark_manager.hpp"
+#include <readline/history.h>
 
 #define MOCK_BOOKMARS_SIZE 1
 
 class MockAgencyManager : public AgencyManager {
 public:
     MOCK_METHOD(std::string, execute_query, (const std::string &query, (std::vector<std::pair<std::string, std::string>> &session_history)), (override));
+};
+
+class MockBaseBookmarkManager : public BookmarkManager {
+public:
+    MockBaseBookmarkManager(AgencyManager* agency_mgr) : BookmarkManager(agency_mgr) {}
 };
 
 class MockBookmarkManager : public BookmarkManager {
@@ -24,6 +30,7 @@ public:
 
 class BookmarkTest : public ::testing::Test {
 protected:
+    MockBaseBookmarkManager mock_base_bookmark_manager;
     MockAgencyManager mock_agency_manager;
     MockBookmarkManager mock_bookmark_manager;
     std::vector<std::pair<std::string, std::string>> session_history;
@@ -31,7 +38,7 @@ protected:
     std::stringstream output_stream;
     std::stringstream error_stream;
 
-    BookmarkTest() : mock_bookmark_manager(&mock_agency_manager) {}
+    BookmarkTest() : mock_base_bookmark_manager(&mock_agency_manager), mock_bookmark_manager(&mock_agency_manager) {}
 
     void SetUp() override {
         // redirect std::cout to output_stream
@@ -374,4 +381,130 @@ TEST_F(BookmarkTest, SaveBookmarks_FailsToOpenReadOnlyFile) {
     EXPECT_TRUE(error_stream.str().find("Error opening file") != std::string::npos);
     // cleanup
     std::remove(filename.c_str());
+}
+
+// Test case: Detects valid bookmark commands.
+TEST_F(BookmarkTest, IsBookmarkCommand_ValidCommand) {
+    // assert
+    EXPECT_TRUE(mock_bookmark_manager.is_bookmark_command("bookmark add alias"));
+}
+
+// Test case: Returns false for invalid commands.
+TEST_F(BookmarkTest, IsBookmarkCommand_InvalidCommand) {
+    // assert
+    EXPECT_FALSE(mock_bookmark_manager.is_bookmark_command("invalid command"));
+}
+
+// Test case: Recognizes -b and --bookmark flags.
+TEST_F(BookmarkTest, IsBookmarkFlag_ValidFlags) {
+    // assert
+    EXPECT_TRUE(mock_bookmark_manager.is_bookmark_flag("-b"));
+    EXPECT_TRUE(mock_bookmark_manager.is_bookmark_flag("--bookmark"));
+}
+
+// Test case: Returns false for non-bookmark flags.
+TEST_F(BookmarkTest, IsBookmarkFlag_InvalidFlags) {
+    // assert
+    EXPECT_FALSE(mock_bookmark_manager.is_bookmark_flag("-x"));
+    EXPECT_FALSE(mock_bookmark_manager.is_bookmark_flag("--remove"));
+}
+
+// Test case: Recognizes -r and --remove flags.
+TEST_F(BookmarkTest, IsRemoveFlag_ValidFlags) {
+    // assert
+    EXPECT_TRUE(mock_bookmark_manager.is_remove_flag("-r"));
+    EXPECT_TRUE(mock_bookmark_manager.is_remove_flag("--remove"));
+}
+
+// Test case: Returns false for non-remove flags.
+TEST_F(BookmarkTest, IsRemoveFlag_InvalidFlags) {
+    // assert
+    EXPECT_FALSE(mock_bookmark_manager.is_remove_flag("-b"));
+    EXPECT_FALSE(mock_bookmark_manager.is_remove_flag("--bookmark"));
+}
+
+// Test case: Successfully detects existing bookmarks by alias.
+TEST_F(BookmarkTest, IsBookmark_ExistingBookmark) {
+    // assert
+    EXPECT_TRUE(mock_bookmark_manager.is_bookmark("alias1"));
+}
+
+// Test case: Returns false for non-existent bookmarks.
+TEST_F(BookmarkTest, IsBookmark_NonExistentBookmark) {
+    // assert
+    EXPECT_FALSE(mock_bookmark_manager.is_bookmark("non_existent_alias"));
+}
+
+// Test case: Retrieves bookmark by alias.
+TEST_F(BookmarkTest, GetBookmark_ExistingAlias) {
+    // act
+    std::pair<std::string, std::string> bookmark = mock_bookmark_manager.get_bookmark("alias1");
+    // assert
+    EXPECT_EQ(bookmark.first, "query1");
+    EXPECT_EQ(bookmark.second, "result1");
+}
+
+// Test case: Returns empty pair for non-existent alias.
+TEST_F(BookmarkTest, GetBookmark_NonExistentAlias) {
+    // act
+    std::pair<std::string, std::string> bookmark = mock_bookmark_manager.get_bookmark("non_existent_alias");
+    // assert
+    EXPECT_EQ(bookmark.first, "");
+    EXPECT_EQ(bookmark.second, "");
+}
+
+// Test case: Detects list flags.
+TEST_F(BookmarkTest, IsListFlag_ValidFlags) {
+    // assert
+    EXPECT_TRUE(mock_bookmark_manager.is_list_flag("bookmark -l"));
+    EXPECT_TRUE(mock_bookmark_manager.is_list_flag("bookmark --list"));
+}
+
+// Test case: Returns false for non-list flags.
+TEST_F(BookmarkTest, IsListFlag_InvalidFlags) {
+    // assert
+    EXPECT_FALSE(mock_bookmark_manager.is_list_flag("bookmark -h"));
+    EXPECT_FALSE(mock_bookmark_manager.is_list_flag("bookmark --help"));
+}
+
+// Test case: Detects help flags.
+TEST_F(BookmarkTest, IsHelpFlag_ValidFlags) {
+    // assert
+    EXPECT_TRUE(mock_bookmark_manager.is_help_flag("bookmark -h"));
+    EXPECT_TRUE(mock_bookmark_manager.is_help_flag("bookmark --help"));
+}
+
+// Test case: Returns false for non-help flags.
+TEST_F(BookmarkTest, IsHelpFlag_InvalidFlags) {
+    // assert
+    EXPECT_FALSE(mock_bookmark_manager.is_help_flag("bookmark -l"));
+    EXPECT_FALSE(mock_bookmark_manager.is_help_flag("bookmark --list"));
+}
+
+// Test case: Retrieves the correct query by index.
+TEST_F(BookmarkTest, GetQueryFromHistory_ValidIndex) {
+    // arrange
+    history_length = 2;
+    add_history("command2");
+    // assert
+    EXPECT_EQ(mock_base_bookmark_manager.get_query_from_history(1), "command2");
+}
+
+// Test case: Returns empty string for invalid index.
+TEST_F(BookmarkTest, GetQueryFromHistory_InvalidIndex) {
+    // assert
+    EXPECT_EQ(mock_base_bookmark_manager.get_query_from_history(3), "");
+}
+
+// Test case: Finds correct result based on query.
+TEST_F(BookmarkTest, FindResultInSessionHistory_ValidQuery) {
+    // assert
+    EXPECT_EQ(mock_base_bookmark_manager.find_result_in_session_history("query1", session_history), "result1");
+    EXPECT_EQ(mock_base_bookmark_manager.find_result_in_session_history("query2", session_history), "result2");
+}
+
+// Test case: Returns empty string if query not found.
+TEST_F(BookmarkTest, FindResultInSessionHistory_InvalidQuery) {
+    // assert
+    EXPECT_EQ(mock_base_bookmark_manager.find_result_in_session_history("non_existent_query", session_history), "");
 }
