@@ -15,7 +15,7 @@ TerminalChar escape(std::string &seq) {
         {std::regex("^\x1b\\[J$"), E_KEY_CLEAR},
         {std::regex("^\x1b\\[(\\d*)P$"), E_KEY_DCH},
         {std::regex("^\x1b\\[K$"), E_KEY_EL},
-        {std::regex("^\x1b\\[H|(\\d+);(\\d+)H$"), E_KEY_CUP},
+        {std::regex("^\x1b\\[H|^\x1b\\[(\\d+);(\\d+)H$"), E_KEY_CUP},
         {std::regex("^\x1b\\[(\\d*)d$"), E_KEY_VPA},
         {std::regex("^\x1b\\[(\\d*)D$"), E_KEY_CUB},
         {std::regex("^\x1b\\[(\\d*)C$"), E_KEY_CUF},
