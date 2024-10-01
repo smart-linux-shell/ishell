@@ -38,10 +38,16 @@ protected:
     std::stringstream output_stream;
     std::stringstream error_stream;
 
+    std::streambuf *original_cout;
+    std::streambuf *original_cerr;
+
     BookmarkTest() : mock_base_bookmark_manager(&mock_agency_manager), mock_bookmark_manager(&mock_agency_manager) {}
 
     void SetUp() override {
         // redirect std::cout to output_stream
+        original_cout = std::cout.rdbuf();
+        original_cerr = std::cerr.rdbuf();
+
         std::cout.rdbuf(output_stream.rdbuf());
         std::cerr.rdbuf(error_stream.rdbuf());
 
@@ -54,8 +60,8 @@ protected:
 
     void TearDown() override {
         // reset the std::cout buffer back to default
-        std::cout.rdbuf(nullptr);
-        std::cerr.rdbuf(nullptr);
+        std::cout.rdbuf(original_cout);
+        std::cerr.rdbuf(original_cerr);
     }
 };
 
