@@ -196,3 +196,155 @@ TEST_F(ScreenRingBufferTest, PushRightScroll) {
     }
 }
 
+// Test case: Resizing works as expected when resizing up.
+TEST_F(ScreenRingBufferTest, ResizeUpWrapped) {
+    screen_ring_buffer->add_char(0, WIDTH - 2, 'a');
+    screen_ring_buffer->add_char(0, WIDTH - 1, 'b');
+    screen_ring_buffer->add_char(1, 0, 'c');
+    screen_ring_buffer->add_char(1, 1, 'd');
+
+    // Resizing up should join
+    ScreenRingBuffer new_screen_ring_buffer = ScreenRingBuffer(HEIGHT, WIDTH + 10, 1024, *screen_ring_buffer);
+
+    EXPECT_EQ((new_screen_ring_buffer.get_char(0, WIDTH - 2)), 'a');
+    EXPECT_EQ((new_screen_ring_buffer.get_char(0, WIDTH - 1)), 'b');
+    EXPECT_EQ((new_screen_ring_buffer.get_char(0, WIDTH)), 'c');
+    EXPECT_EQ((new_screen_ring_buffer.get_char(0, WIDTH + 1)), 'd');
+};
+
+TEST_F(ScreenRingBufferTest, ResizeUpNotWrapped) {
+    screen_ring_buffer->add_char(0, WIDTH - 2, 'a');
+    screen_ring_buffer->add_char(0, WIDTH - 1, 'b');
+    screen_ring_buffer->new_line(0);
+    screen_ring_buffer->add_char(1, 0, 'c');
+    screen_ring_buffer->add_char(1, 1, 'd');
+
+    // Resizing up should not join
+    ScreenRingBuffer new_screen_ring_buffer = ScreenRingBuffer(HEIGHT, WIDTH + 10, 1024, *screen_ring_buffer);
+
+    EXPECT_EQ((new_screen_ring_buffer.get_char(0, WIDTH - 2)), 'a');
+    EXPECT_EQ((new_screen_ring_buffer.get_char(0, WIDTH - 1)), 'b');
+    EXPECT_EQ((new_screen_ring_buffer.get_char(0, WIDTH)), 0);
+    EXPECT_EQ((new_screen_ring_buffer.get_char(1, 0)), 'c');
+    EXPECT_EQ((new_screen_ring_buffer.get_char(1, 1)), 'd');
+    EXPECT_EQ((new_screen_ring_buffer.get_char(1, 2)), 0);
+};
+
+// Test case: Resizing works as expected when resizing down.
+TEST_F(ScreenRingBufferTest, ResizeDownRegular) {
+    screen_ring_buffer->add_char(0, WIDTH - 4, 'a');
+    screen_ring_buffer->add_char(0, WIDTH - 3, 'b');
+    screen_ring_buffer->add_char(0, WIDTH - 2, 'c');
+    screen_ring_buffer->add_char(0, WIDTH - 1, 'd');
+
+    // for (int i = 0; i < HEIGHT; i++) {
+    //     for (int j = 0; j < WIDTH; j++) {
+    //         char ch = screen_ring_buffer->get_char(i, j);
+    //         if (ch == 0) {
+    //             std::cout << 0;
+    //         } else {
+    //             std::cout << ch;
+    //         }
+    //     }
+
+    //     std::cout << "\n";
+    // }
+
+    // Resizing down should split
+    ScreenRingBuffer new_screen_ring_buffer = ScreenRingBuffer(HEIGHT, WIDTH - 2, 1024, *screen_ring_buffer);
+
+    // for (int i = 0; i < HEIGHT; i++) {
+    //     for (int j = 0; j < WIDTH - 2; j++) {
+    //         char ch = new_screen_ring_buffer.get_char(i, j);
+    //         if (ch == 0) {
+    //             std::cout << 0;
+    //         } else {
+    //             std::cout << ch;
+    //         }
+    //     }
+
+    //     std::cout << "\n";
+    // }
+
+    EXPECT_EQ((new_screen_ring_buffer.get_char(0, WIDTH - 2 - 2)), 'a');
+    EXPECT_EQ((new_screen_ring_buffer.get_char(0, WIDTH - 2 - 1)), 'b');
+    EXPECT_EQ((new_screen_ring_buffer.get_char(1, 0)), 'c');
+    EXPECT_EQ((new_screen_ring_buffer.get_char(1, 1)), 'd');
+};
+
+TEST_F(ScreenRingBufferTest, ResizeDownDoubleWrapped) {
+    screen_ring_buffer->add_char(0, WIDTH - 4, 'a');
+    screen_ring_buffer->add_char(0, WIDTH - 3, 'b');
+    screen_ring_buffer->add_char(0, WIDTH - 2, 'c');
+    screen_ring_buffer->add_char(0, WIDTH - 1, 'd');
+    screen_ring_buffer->add_char(1, WIDTH - 4, 'e');
+    screen_ring_buffer->add_char(1, WIDTH - 3, 'f');
+    screen_ring_buffer->add_char(1, WIDTH - 2, 'g');
+    screen_ring_buffer->add_char(1, WIDTH - 1, 'h');
+
+    ScreenRingBuffer new_screen_ring_buffer = ScreenRingBuffer(HEIGHT, WIDTH - 2, 1024, *screen_ring_buffer);
+
+    for (int i = 0; i < HEIGHT; i++) {
+        for (int j = 0; j < WIDTH - 2; j++) {
+            char ch = new_screen_ring_buffer.get_char(i, j);
+            if (i == 0 && j == WIDTH - 2 - 2) {
+                EXPECT_EQ(ch, 'a');
+            } else if (i == 0 && j == WIDTH - 2 - 1) {
+                EXPECT_EQ(ch, 'b');
+            } else if (i == 1 && j == 0) {
+                EXPECT_EQ(ch, 'c');
+            } else if (i == 1 && j == 1) {
+                EXPECT_EQ(ch, 'd');
+            } else if (i == 2 && j == 0) {
+                EXPECT_EQ(ch, 'e');
+            } else if (i == 2 && j == 1) {
+                EXPECT_EQ(ch, 'f');
+            } else if (i == 2 && j == 2) {
+                EXPECT_EQ(ch, 'g');
+            } else if (i == 2 && j == 3) {
+                EXPECT_EQ(ch, 'h');
+            } else {
+                EXPECT_EQ(ch, 0);
+            }
+        }
+    }
+};
+
+TEST_F(ScreenRingBufferTest, ResizeDownDoubleNotWrapped) {
+    screen_ring_buffer->add_char(0, WIDTH - 4, 'a');
+    screen_ring_buffer->add_char(0, WIDTH - 3, 'b');
+    screen_ring_buffer->add_char(0, WIDTH - 2, 'c');
+    screen_ring_buffer->add_char(0, WIDTH - 1, 'd');
+    screen_ring_buffer->new_line(0);
+    screen_ring_buffer->add_char(1, WIDTH - 4, 'e');
+    screen_ring_buffer->add_char(1, WIDTH - 3, 'f');
+    screen_ring_buffer->add_char(1, WIDTH - 2, 'g');
+    screen_ring_buffer->add_char(1, WIDTH - 1, 'h');
+
+    ScreenRingBuffer new_screen_ring_buffer = ScreenRingBuffer(HEIGHT, WIDTH - 2, 1024, *screen_ring_buffer);
+
+    for (int i = 0; i < HEIGHT; i++) {
+        for (int j = 0; j < WIDTH - 2; j++) {
+            char ch = new_screen_ring_buffer.get_char(i, j);
+            if (i == 0 && j == WIDTH - 2 - 2) {
+                EXPECT_EQ(ch, 'a');
+            } else if (i == 0 && j == WIDTH - 2 - 1) {
+                EXPECT_EQ(ch, 'b');
+            } else if (i == 1 && j == 0) {
+                EXPECT_EQ(ch, 'c');
+            } else if (i == 1 && j == 1) {
+                EXPECT_EQ(ch, 'd');
+            } else if (i == 2 && j == WIDTH - 2 - 2) {
+                EXPECT_EQ(ch, 'e');
+            } else if (i == 2 && j == WIDTH - 2 - 1) {
+                EXPECT_EQ(ch, 'f');
+            } else if (i == 3 && j == 0) {
+                EXPECT_EQ(ch, 'g');
+            } else if (i == 3 && j == 1) {
+                EXPECT_EQ(ch, 'h');
+            } else {
+                EXPECT_EQ(ch, 0);
+            }
+        }
+    }
+}

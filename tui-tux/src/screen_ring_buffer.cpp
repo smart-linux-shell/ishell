@@ -287,7 +287,7 @@ void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines
         // Reconstruct line
 
         for (int j = old_buffer.terminal_cols - 1; j >= 0; j--) {
-            if (old_buffer.lines[old_y].data[j] != 0) {
+            if (old_buffer.lines[old_y].data[j] != 0 || line.size() > 0) {
                 line = old_buffer.lines[old_y].data[j] + line;
             }
         }
