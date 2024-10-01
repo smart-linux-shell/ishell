@@ -185,7 +185,6 @@ void ScreenRingBuffer::push_right(int terminal_y, int terminal_x) {
             // Push right. If empty spaces are found on the line (that can be used to fill), stop here.
             if (lines[y].data[x] == 0) {
                 looping = false;
-                break;
             }
 
             lines[y].data[x] = lines[y].data[x - 1];

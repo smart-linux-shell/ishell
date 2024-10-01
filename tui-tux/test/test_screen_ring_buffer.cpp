@@ -150,7 +150,7 @@ TEST_F(ScreenRingBufferTest, PushRightNoScroll) {
         screen_ring_buffer->add_char(0, i, 'a' + i);
     }
 
-    screen_ring_buffer->push_right(0, 0);
+    screen_ring_buffer->push_right(0, 0);  
 
     char result = screen_ring_buffer->get_char(0, 0);
     char expected = 'a';
@@ -194,7 +194,37 @@ TEST_F(ScreenRingBufferTest, PushRightScroll) {
         result = screen_ring_buffer->get_char(HEIGHT - 1, i);
         EXPECT_EQ(result, expected);
     }
-}
+};
+
+// Test case: Push left works correctly.
+TEST_F(ScreenRingBufferTest, PushLeft) {
+    for (int i = 0; i < WIDTH; i++) {
+        screen_ring_buffer->add_char(0, i, i);
+        screen_ring_buffer->add_char(1, i, WIDTH + i);
+    }
+
+    screen_ring_buffer->push_left(0, 0);
+
+    char ch, expected;
+
+    for (int i = 0; i < WIDTH - 1; i++) {
+        ch = screen_ring_buffer->get_char(0, i);
+        expected = i + 1;
+        EXPECT_EQ(ch, expected);
+
+        ch = screen_ring_buffer->get_char(1, i);
+        expected = WIDTH + i + 1;
+        EXPECT_EQ(ch, expected);
+    }
+
+    ch = screen_ring_buffer->get_char(0, WIDTH - 1);
+    expected = WIDTH;
+    EXPECT_EQ(ch, expected);
+
+    ch = screen_ring_buffer->get_char(1, WIDTH - 1);
+    expected = 0;
+    EXPECT_EQ(ch, expected);
+};
 
 // Test case: Resizing works as expected when resizing up.
 TEST_F(ScreenRingBufferTest, ResizeUpWrapped) {
@@ -237,34 +267,8 @@ TEST_F(ScreenRingBufferTest, ResizeDownRegular) {
     screen_ring_buffer->add_char(0, WIDTH - 2, 'c');
     screen_ring_buffer->add_char(0, WIDTH - 1, 'd');
 
-    // for (int i = 0; i < HEIGHT; i++) {
-    //     for (int j = 0; j < WIDTH; j++) {
-    //         char ch = screen_ring_buffer->get_char(i, j);
-    //         if (ch == 0) {
-    //             std::cout << 0;
-    //         } else {
-    //             std::cout << ch;
-    //         }
-    //     }
-
-    //     std::cout << "\n";
-    // }
-
     // Resizing down should split
     ScreenRingBuffer new_screen_ring_buffer = ScreenRingBuffer(HEIGHT, WIDTH - 2, 1024, *screen_ring_buffer);
-
-    // for (int i = 0; i < HEIGHT; i++) {
-    //     for (int j = 0; j < WIDTH - 2; j++) {
-    //         char ch = new_screen_ring_buffer.get_char(i, j);
-    //         if (ch == 0) {
-    //             std::cout << 0;
-    //         } else {
-    //             std::cout << ch;
-    //         }
-    //     }
-
-    //     std::cout << "\n";
-    // }
 
     EXPECT_EQ((new_screen_ring_buffer.get_char(0, WIDTH - 2 - 2)), 'a');
     EXPECT_EQ((new_screen_ring_buffer.get_char(0, WIDTH - 2 - 1)), 'b');
