@@ -32,7 +32,14 @@ int ScreenRingBuffer::add_char(int terminal_y, int terminal_x, char ch) {
 }
 
 const char ScreenRingBuffer::get_char(int terminal_y, int terminal_x) {
-    int y = (terminal_begin_line + terminal_y) % max_lines;
+    int y;
+    
+    if (manual_scroll_begin_line == MANUAL_SCROLL_NULL) {
+        y = (terminal_begin_line + terminal_y) % max_lines;
+    } else {
+        y = (manual_scroll_begin_line + terminal_y) % max_lines;
+    }
+    
     int x = terminal_x;
 
     if (is_out_of_terminal_bounds(terminal_y, terminal_x)) {
@@ -104,12 +111,7 @@ int ScreenRingBuffer::clear() {
     filled_lines = 0;
     terminal_begin_line = 0;
 
-    lines = new Line[max_lines];
-    for (int i = 0; i < max_lines; i++) {
-        lines[i].data = new char[terminal_cols];
-        memset(lines[i].data, 0, terminal_cols);
-        lines[i].new_paragraph = false;
-    }
+    lines = std::vector<Line>(max_lines, {std::vector<char>(terminal_cols, 0), false});
 
     return 0;
 }
@@ -126,6 +128,37 @@ bool ScreenRingBuffer::has_new_line(int terminal_y) {
     }
 
     return lines[y].new_paragraph;
+}
+
+void ScreenRingBuffer::push_left(int terminal_y, int terminal_x) {
+    if (is_out_of_terminal_bounds(terminal_y, terminal_x)) {
+        return;
+    }
+
+    int y = (terminal_begin_line + terminal_y) % max_lines;
+    int x = terminal_x;
+
+    bool looping = true;
+
+    while (looping) {
+        // Move all chars on the line to the left
+        while (x < terminal_cols - 1) {
+            lines[y].data[x] = lines[y].data[x + 1];
+            x++;
+        }
+
+        int next_y = (y + 1) % max_lines;
+        if (!lines[y].new_paragraph && !is_out_of_terminal_bounds(next_y, 0)) {
+            // Can keep pushing left on the next line. Should also grab first
+            // character from the next line and place it at the end of this one.
+            lines[y].data[terminal_cols - 1] = lines[next_y].data[0];
+            x = 0;
+            y = next_y;
+        } else {
+            // Over
+            looping = false;
+        }
+    }
 }
 
 void ScreenRingBuffer::push_right(int terminal_y, int terminal_x) {
@@ -192,10 +225,40 @@ void ScreenRingBuffer::push_right(int terminal_y, int terminal_x) {
     }
 }
 
+const bool ScreenRingBuffer::is_in_manual_scroll() {
+    return manual_scroll_begin_line != MANUAL_SCROLL_NULL;
+}
+
+void ScreenRingBuffer::enter_manual_scroll() {
+    manual_scroll_begin_line = terminal_begin_line;
+}
+
+void ScreenRingBuffer::manual_scroll_up() {
+    if (manual_scroll_begin_line != start_line) {
+        // Can go further up
+        manual_scroll_begin_line--;
+        if (manual_scroll_begin_line < 0) {
+            manual_scroll_begin_line += max_lines;
+        }
+    }
+}
+
+void ScreenRingBuffer::manual_scroll_down() {
+    if (manual_scroll_begin_line != terminal_begin_line) {
+        // Can go further down
+        manual_scroll_begin_line = (manual_scroll_begin_line + 1) % max_lines;
+    }
+}
+
+void ScreenRingBuffer::manual_scroll_reset() {
+    manual_scroll_begin_line = MANUAL_SCROLL_NULL;
+}
+
 void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines) {
     this->terminal_lines = terminal_lines;
     this->terminal_cols = terminal_cols;
     this->max_lines = max_lines;
+    manual_scroll_begin_line = MANUAL_SCROLL_NULL;
 
     clear();
 }
@@ -223,7 +286,7 @@ void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines
         // Reconstruct line
 
         for (int j = old_buffer.terminal_cols - 1; j >= 0; j--) {
-            if (old_buffer.lines[old_y].data[j] != 0) {
+            if (old_buffer.lines[old_y].data[j] != 0 || line.size() > 0) {
                 line = old_buffer.lines[old_y].data[j] + line;
             }
         }
@@ -291,8 +354,7 @@ void ScreenRingBuffer::init(int terminal_lines, int terminal_cols, int max_lines
 void ScreenRingBuffer::expand_down() {
     if (filled_lines == max_lines) {
         // Push start down
-        memset(lines[start_line].data, 0, terminal_cols);
-        lines[start_line].new_paragraph = false;
+        lines[start_line] = {std::vector<char>(terminal_cols, 0), false};
         start_line = (start_line + 1) % max_lines;
     } else {
         // Increase size
@@ -303,8 +365,7 @@ void ScreenRingBuffer::expand_down() {
 void ScreenRingBuffer::expand_up() {
     if (filled_lines == max_lines) {
         // Push start up
-        memset(lines[start_line].data, 0, terminal_cols);
-        lines[start_line].new_paragraph = false;
+        lines[start_line] = {std::vector<char>(terminal_cols, 0), false};
         start_line--;
         if (start_line == -1) {
             start_line = max_lines - 1;
@@ -359,6 +420,5 @@ void ScreenRingBuffer::push_down(int y) {
         lines[current_y] = lines[prev_y];
     }
 
-    lines[y].new_paragraph = false;
-    lines[y].data = new char[terminal_cols];
+    lines[y] = {std::vector<char>(terminal_cols, 0), false};
 }

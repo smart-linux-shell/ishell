@@ -8,6 +8,7 @@
 class AgencyManager {
 public:
     AgencyManager();
+
     virtual ~AgencyManager();
 
     virtual void get_agency_url();

@@ -37,6 +37,7 @@ private:
     void handle_pty_input(int fd, char ch);
     void zoom_in();
     void zoom_out();
+    void toggle_manual_scroll();
 };
 
 #endif

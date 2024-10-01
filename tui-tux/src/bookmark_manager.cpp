@@ -12,6 +12,7 @@
 
 using json = nlohmann::json;
 
+
 #define HELP_FILENAME "manuals/bookmark.txt"
 
 BookmarkManager::BookmarkManager(AgencyManager* agencyManager) {
@@ -152,6 +153,7 @@ void BookmarkManager::remove_bookmark(const std::string &alias) {
         std::cout << "Removed bookmark '" << alias << "'.\n";
     } else {
         std::cerr << "Error: Bookmark '" << alias << "' not found.\n";
+
     }
 }
 
@@ -169,6 +171,7 @@ void BookmarkManager::list_bookmarks() const {
 
 void BookmarkManager::help(std::string manual_filename) {
     std::ifstream file(manual_filename);
+
     if (!file.is_open()) {
         std::cerr << "Error: Could not find the documentation.\n";
         return;

@@ -18,16 +18,22 @@ enum class HttpRequestType {
     PATCH
 };
 
-json make_http_request(HttpRequestType request_type, const std::string& url,
-                       const std::map<std::string, std::string>& query_params = {},
-                       const json& body = nullptr,
-                       const std::map<std::string, std::string>& headers = {});
+class HttpsClient {
+public:
+    json make_http_request(HttpRequestType request_type, const std::string& url,
+                        const std::map<std::string, std::string>& query_params,
+                        const json& body,
+                        const std::map<std::string, std::string>& headers);
 
-std::string build_query_string(const std::map<std::string, std::string>& query_params);
-void set_request_type(CURL* curl, HttpRequestType request_type);
-void add_request_body(CURL* curl, HttpRequestType request_type, const json& body, std::string& jsonData);
-void add_request_headers(CURL* curl, const std::map<std::string, std::string>& headers);
-void set_response_callbacks(CURL* curl, std::string& readBuffer, std::map<std::string, std::string>& response_headers);
-json perform_request(CURL* curl);
+    std::string build_query_string(const std::map<std::string, std::string>& query_params);
+    virtual void set_request_type(CURL* curl, HttpRequestType request_type);
+    void add_request_body(CURL* curl, HttpRequestType request_type, const json& body, std::string& jsonData);
+    void add_request_headers(CURL* curl, const std::map<std::string, std::string>& headers);
+    virtual void set_response_callbacks(CURL* curl, std::string& readBuffer, std::map<std::string, std::string>& response_headers);
+    virtual json perform_request(CURL* curl);
+    virtual CURL *curl_easy_init();
+    virtual CURLcode curl_easy_perform(CURL *curl);
+};
+
 
 #endif // HTTPS_CLIENT_HPP

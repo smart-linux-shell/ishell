@@ -6,13 +6,14 @@
 #include <iostream>
 #include "../nlohmann/json.hpp"
 #include "../include/https_client.hpp"
+#include "../include/agency_request_wrapper.hpp"
 
 #define INSTALLED_PACKAGES_BUFSIZ 128
 
 using json = nlohmann::json;
 
 // Function to get Linux distribution
-std::string get_linux_distro() {
+std::string AgencyRequestWrapper::get_linux_distro() {
     struct utsname buffer;
     if (uname(&buffer) != 0) {
         return "Unknown";
@@ -21,7 +22,7 @@ std::string get_linux_distro() {
 }
 
 // Function to get installed packages (simple example using dpkg on Debian/Ubuntu systems)
-std::vector<std::string> get_installed_packages() {
+std::vector<std::string> AgencyRequestWrapper::get_installed_packages() {
     std::vector<std::string> packages;
     FILE* pipe = popen("dpkg --get-selections | awk '{print $1}'", "r");
     if (!pipe) {
@@ -36,8 +37,8 @@ std::vector<std::string> get_installed_packages() {
 }
 
 // Function to get SSH IP, port, and user from environment variables (? might change ?)
-std::string get_ssh_ip() {
-    char* ssh_ip = std::getenv("SSH_CLIENT");
+std::string AgencyRequestWrapper::get_ssh_ip() {
+    char* ssh_ip = getenv("SSH_CLIENT");
     if (ssh_ip) {
         std::string ssh_ip_str(ssh_ip);
         return ssh_ip_str.substr(0, ssh_ip_str.find(' '));
@@ -45,16 +46,16 @@ std::string get_ssh_ip() {
     return "Unknown";
 }
 
-int get_ssh_port() {
-    char* ssh_port = std::getenv("SSH_PORT");
+int AgencyRequestWrapper::get_ssh_port() {
+    char* ssh_port = getenv("SSH_PORT");
     if (ssh_port) {
         return std::stoi(ssh_port);
     }
     return 22;
 }
 
-std::string get_ssh_user() {
-    char* ssh_user = std::getenv("USER");
+std::string AgencyRequestWrapper::get_ssh_user() {
+    char* ssh_user = getenv("USER");
     if (ssh_user) {
         return std::string(ssh_user);
     }
@@ -62,7 +63,7 @@ std::string get_ssh_user() {
 }
 
 // Function to send request to agent's server
-json send_request_to_agent_server(const std::string& url, const std::string& user_query) {
+json AgencyRequestWrapper::send_request_to_agent_server(const std::string& url, const std::string& user_query) {
     std::string distro = get_linux_distro();
     std::vector<std::string> installed_packages = get_installed_packages();
     std::string ssh_ip = get_ssh_ip();
@@ -88,7 +89,7 @@ json send_request_to_agent_server(const std::string& url, const std::string& use
 }
 
 // Wrapper prep function for request for agent
-std::string ask_agent(const std::string& url, const std::string& user_query) {
+std::string AgencyRequestWrapper::ask_agent(const std::string& url, const std::string& user_query) {
     json response = send_request_to_agent_server(url, user_query);
 
     if (response.contains("error")) {
@@ -104,4 +105,16 @@ std::string ask_agent(const std::string& url, const std::string& user_query) {
         std::cerr << "\"content\" field not found in response body" << std::endl;
         return "";
     }
+}
+
+json AgencyRequestWrapper::make_http_request(HttpRequestType request_type, const std::string& url,
+                       const std::map<std::string, std::string>& query_params = {},
+                       const json& body = nullptr,
+                       const std::map<std::string, std::string>& headers = {}) {
+    HttpsClient https_client;
+    return https_client.make_http_request(request_type, url, query_params, body, headers);
+}
+
+char *AgencyRequestWrapper::getenv(const char *key) {
+    return std::getenv(key);
 }

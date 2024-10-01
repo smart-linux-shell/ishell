@@ -11,6 +11,7 @@
 using json = nlohmann::json;
 
 class BookmarkManager {
+
 private:
     AgencyManager *agency_manager;
 public:
