@@ -23,15 +23,12 @@ int Screen::get_n_cols() {
 }
 
 void Screen::write_char(char ch) {
-    bool inserting = false;
-
     int curx = sgetx();
     int cury = sgety();
 
     if (pushing_right > 0) {
         push_right();
         pushing_right--;
-        inserting = true;
     }
 
     if (!cursor_wrapped) {
@@ -50,12 +47,6 @@ void Screen::write_char(char ch) {
         cursor_wrapped = false;
     }
 
-    if (inserting) {
-        show_all_chars();
-    } else {
-        show_char(cury, curx);
-    }
-    
     smove(cury, curx + 1);
 }
 
@@ -274,22 +265,6 @@ void Screen::init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *new_o
     // Draw text
     std::pair<int, int> pair = show_all_chars();
     smove(pair.second, pair.first);
-}
-
-void Screen::show_char(int y, int x) {
-    // Preserve
-    int curx = sgetx();
-    int cury = sgety();
-
-    char ch = buffer.get_char(y, x);
-
-    if (ch == 0) {
-        ch = ' ';
-    }
-
-    mvsaddch(y, x, ch);
-    smove(cury, curx);
-    srefresh();
 }
 
 // Returns where the cursor should be (no more chars after it)

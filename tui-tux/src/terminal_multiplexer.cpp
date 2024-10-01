@@ -535,6 +535,7 @@ int TerminalMultiplexer::handle_screen_output(Screen &screen, int fd) {
             }
         }
 
+        screen.show_all_chars();
     }
 
     refresh_cursor();

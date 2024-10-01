@@ -42,6 +42,8 @@ public:
     void manual_scroll_down();
     void manual_scroll_reset();
 
+    std::pair<int, int> show_all_chars();
+
 private:
     int n_lines, n_cols;
     bool cursor_wrapped = false;
@@ -61,8 +63,6 @@ private:
 
     void init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *outer, int new_pty_master, int new_pid);
     void init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *outer, Screen &old_screen);
-    void show_char(int y, int x);
-    std::pair<int, int> show_all_chars();
 
 public:
     // Wrappers
