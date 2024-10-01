@@ -35,4 +35,5 @@ public:
     virtual CURLcode curl_easy_perform(CURL *curl);
 };
 
+
 #endif // HTTPS_CLIENT_HPP

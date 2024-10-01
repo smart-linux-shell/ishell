@@ -8,6 +8,8 @@ AgencyManager::AgencyManager() : agency_url_set(false) {
     get_agency_url();
 }
 
+AgencyManager::~AgencyManager() {}
+
 void AgencyManager::get_agency_url() {
     agency_url_env = getenv("ISHELL_AGENCY_URL");
     if (agency_url_env != NULL) {

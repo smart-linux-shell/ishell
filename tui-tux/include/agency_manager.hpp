@@ -9,8 +9,10 @@ class AgencyManager {
 public:
     AgencyManager();
 
-    void get_agency_url();
-    std::string execute_query(const std::string &query, std::vector<std::pair<std::string, std::string>> &session_history);
+    virtual ~AgencyManager();
+
+    virtual void get_agency_url();
+    virtual std::string execute_query(const std::string &query, std::vector<std::pair<std::string, std::string>> &session_history);
 
 private:
     std::string agency_url;

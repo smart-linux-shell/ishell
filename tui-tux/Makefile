@@ -4,6 +4,7 @@ TEST_TARGET := test_ishell
 # Configurable
 NO_MAIN_SOURCES := screen_ring_buffer.cpp screen.cpp escape.cpp agency_manager.cpp bookmark_manager.cpp assistant.cpp terminal_multiplexer.cpp agency_request_wrapper.cpp https_client.cpp
 SOURCES := $(NO_MAIN_SOURCES) main.cpp
+
 TEST_SOURCES := test_bookmark_manager.cpp test_screen_ring_buffer.cpp test_agency_request_wrapper.cpp test_https_client.cpp test_escape.cpp
 FLAGS := -Wall
 LIBS := -lncurses -lreadline -lcurl
@@ -19,7 +20,7 @@ TEST_SOURCES := $(patsubst %, test/%, $(TEST_SOURCES))
 
 INCLUDE := -Iinclude
 
-CXXFLAGS := $(FLAGS) -std=c++17
+CXXFLAGS := $(FLAGS) -std=c++17 -g
 
 Cxx := g++
 

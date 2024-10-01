@@ -12,8 +12,14 @@
 
 using json = nlohmann::json;
 
-BookmarkManager::BookmarkManager() {
+
+#define HELP_FILENAME "manuals/bookmark.txt"
+
+BookmarkManager::BookmarkManager(AgencyManager* agencyManager) {
+  agency_manager = agencyManager;
 }
+
+BookmarkManager::~BookmarkManager() {}
 
 bool BookmarkManager::create_bookmarks_file(const std::string &filename) {
     std::ofstream create_file(filename);
@@ -119,21 +125,23 @@ std::string BookmarkManager::find_result_in_session_history(const std::string &q
 }
 
 void BookmarkManager::bookmark(int index, const std::string &alias, std::vector<std::pair<std::string, std::string>> &session_history) {
+   // bookmark already exists
     if (bookmarks.find(alias) != bookmarks.end()) {
-        std::cout << "Error: Bookmark '" << alias << "' already exists.\n";
+        std::cerr << "Error: Bookmark '" << alias << "' already exists.\n";
         return;
     }
+    // find query
     std::string query = get_query_from_history(index);
     if (query.empty()) {
-        std::cout << "Error: Invalid history index.\n";
+        std::cerr << "Error: Invalid history index.\n";
         return;
     }
-    AgencyManager agency_manager;
-    std::string result = agency_manager.execute_query(query, session_history);
+    // find result
+    std::string result = find_result_in_session_history(query, session_history);
     if (result.empty()) {
-        std::cout << "Error executing query.\n";
-        return;
+       result = agency_manager->execute_query(query, session_history);
     }
+    // bookmark
     bookmarks[alias] = {query, result};
     std::cout << "Saved the query under the bookmark '" << alias  << "'" << "\n";
 }
@@ -144,7 +152,8 @@ void BookmarkManager::remove_bookmark(const std::string &alias) {
         bookmarks.erase(it);
         std::cout << "Removed bookmark '" << alias << "'.\n";
     } else {
-        std::cout << "Error: Bookmark '" << alias << "' not found.\n";
+        std::cerr << "Error: Bookmark '" << alias << "' not found.\n";
+
     }
 }
 
@@ -160,8 +169,9 @@ void BookmarkManager::list_bookmarks() const {
     }
 }
 
-void BookmarkManager::help() {
-    std::ifstream file("manuals/bookmark.txt");
+void BookmarkManager::help(std::string manual_filename) {
+    std::ifstream file(manual_filename);
+
     if (!file.is_open()) {
         std::cerr << "Error: Could not find the documentation.\n";
         return;
@@ -175,15 +185,15 @@ void BookmarkManager::help() {
 
 bool BookmarkManager::try_parse_bookmark_command(const std::string &input_str, std::string &cmd, int &index, std::string &alias) {
     std::istringstream iss(input_str);
-    // Try to parse "bookmark <index> <alias>"
-    if (iss >> cmd >> index >> alias) {
+    // try to parse "bookmark <index> <alias>"
+    if (iss >> cmd >> index >> alias && cmd == "bookmark") {
         return true;
     }
-    // If parsing fails, try to parse "bookmark <alias>"
+    // if parsing fails, try to parse "bookmark <alias>"
     iss.clear();
     iss.str(input_str);
-    if (iss >> cmd >> alias) {
-        index = 1; // Default index if not provided
+    if (iss >> cmd >> alias && cmd == "bookmark") {
+        index = 1; // default index if not provided
         return true;
     }
     return false;
@@ -195,7 +205,7 @@ void BookmarkManager::handle_bookmark_command(const std::string &input_str, std:
         return;
     }
     else if (is_help_flag(input_str)) {
-        help();
+        help(HELP_FILENAME);
         return;
     }
 
@@ -205,7 +215,7 @@ void BookmarkManager::handle_bookmark_command(const std::string &input_str, std:
     if (try_parse_bookmark_command(input_str, cmd, index, alias)) {
         bookmark(index, alias, session_history);
     } else {
-        std::cerr << "Invalid bookmark command format.\n";
-        help();
+        std::cerr << "Error: Invalid bookmark command format.\n";
+        help(HELP_FILENAME);
     }
 }
