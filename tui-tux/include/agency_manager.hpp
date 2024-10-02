@@ -7,18 +7,17 @@
 
 class AgencyManager {
 public:
-    AgencyManager();
-
+    AgencyManager(AgencyRequestWrapper* request_wrapper);
     virtual ~AgencyManager();
 
-    virtual void get_agency_url();
+    void get_agency_url();
     virtual std::string execute_query(const std::string &query, std::vector<std::pair<std::string, std::string>> &session_history);
 
-private:
+    bool agency_url_set;
     std::string agency_url;
     std::string assistant_url;
-    char *agency_url_env;
-    bool agency_url_set;
+    const char* agency_url_env;
+    AgencyRequestWrapper* request_wrapper;
 };
 
 #endif // AGENCY_HPP

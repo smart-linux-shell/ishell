@@ -16,7 +16,7 @@ public:
     virtual int get_ssh_port();
     virtual std::string get_ssh_user();
     json send_request_to_agent_server(const std::string &url, const std::string &user_query);
-    std::string ask_agent(const std::string &url, const std::string &user_query);
+    virtual std::string ask_agent(const std::string &url, const std::string &user_query);
     virtual json make_http_request(HttpRequestType request_type, const std::string& url,
                         const std::map<std::string, std::string>& query_params,
                         const json& body,

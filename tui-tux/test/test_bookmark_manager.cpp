@@ -12,6 +12,8 @@
 
 class MockAgencyManager : public AgencyManager {
 public:
+    MockAgencyManager(AgencyRequestWrapper* request_wrapper) : AgencyManager(request_wrapper) {}
+
     MOCK_METHOD(std::string, execute_query, (const std::string &query, (std::vector<std::pair<std::string, std::string>> &session_history)), (override));
 };
 
@@ -30,8 +32,9 @@ public:
 
 class BookmarkTest : public ::testing::Test {
 protected:
-    MockBaseBookmarkManager mock_base_bookmark_manager;
+    AgencyRequestWrapper request_wrapper;
     MockAgencyManager mock_agency_manager;
+    MockBaseBookmarkManager mock_base_bookmark_manager;
     MockBookmarkManager mock_bookmark_manager;
     std::vector<std::pair<std::string, std::string>> session_history;
 
@@ -41,7 +44,10 @@ protected:
     std::streambuf *original_cout;
     std::streambuf *original_cerr;
 
-    BookmarkTest() : mock_base_bookmark_manager(&mock_agency_manager), mock_bookmark_manager(&mock_agency_manager) {}
+    BookmarkTest()
+        : mock_agency_manager(&request_wrapper),
+          mock_base_bookmark_manager(&mock_agency_manager),
+          mock_bookmark_manager(&mock_agency_manager) {}
 
     void SetUp() override {
         // redirect std::cout to output_stream
@@ -64,6 +70,7 @@ protected:
         std::cerr.rdbuf(original_cerr);
     }
 };
+
 
 // Test case: Successfully bookmarks command using valid alias and index.
 TEST_F(BookmarkTest, Bookmark_SuccessfullyAddsBookmark) {

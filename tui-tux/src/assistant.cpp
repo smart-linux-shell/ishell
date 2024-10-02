@@ -14,7 +14,8 @@
 std::vector<std::pair<std::string, std::string>> session_history;
 
 void assistant() {
-    AgencyManager manager;
+    AgencyRequestWrapper request_wrapper;
+    AgencyManager manager(&request_wrapper);
     using_history();
     manager.get_agency_url();
 
