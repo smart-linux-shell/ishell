@@ -173,15 +173,15 @@ void Screen::newline() {
     srefresh();
 }
 
-const WINDOW *Screen::get_window() {
+WINDOW *Screen::get_window() const {
     return window;
 }
 
-const int Screen::get_pty_master() {
+int Screen::get_pty_master() const {
     return pty_master;
 }
 
-const int Screen::get_pid() {
+int Screen::get_pid() const {
     return pid;
 }
 
@@ -309,11 +309,16 @@ std::pair<int, int> Screen::show_all_chars() {
     return pair;
 }
 
+bool Screen::consume_refresh() {
+    bool val = scheduled_refresh;
+    scheduled_refresh = false;
+
+    return val;
+}
+
 // Wrappers
 int Screen::srefresh() {
-    if (window != NULL) {
-        return wrefresh(window);
-    }
+    scheduled_refresh = true;
 
     return OK;
 }

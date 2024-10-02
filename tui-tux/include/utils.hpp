@@ -3,7 +3,8 @@
 
 #define FOCUS_NULL -1
 
-#define MAX_EVENTS 5
+#define MAX_EVENTS 6
+#define DO_UPDATE_MS 100
 
 #define KEY_BEL 0x07
 #define KEY_SI 0x0f

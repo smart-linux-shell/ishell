@@ -29,9 +29,9 @@ public:
     void scroll_down();
     void scroll_up();
     void newline();
-    const WINDOW *get_window();
-    const int get_pty_master();
-    const int get_pid();
+    WINDOW *get_window() const;
+    int get_pty_master() const;
+    int get_pid() const;
     void delete_wins();
     void insert_next(int num);
     void push_right();
@@ -44,6 +44,8 @@ public:
 
     std::pair<int, int> show_all_chars();
 
+    bool consume_refresh();
+
 private:
     int n_lines, n_cols;
     bool cursor_wrapped = false;
@@ -55,6 +57,8 @@ private:
     int fallback_y, fallback_x;
 
     int pushing_right;
+
+    bool scheduled_refresh = false;
 
     WINDOW *window;
     WINDOW *outer;

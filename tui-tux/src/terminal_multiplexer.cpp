@@ -1,6 +1,7 @@
 #include <ncurses.h>
 #include <sys/epoll.h>
 #include <sys/signalfd.h>
+#include <sys/timerfd.h>
 #include <signal.h>
 #include <pty.h>
 #include <stdlib.h>
@@ -350,6 +351,10 @@ void TerminalMultiplexer::run_terminal() {
     sigaddset(&mask, SIGWINCH);
 
     int sigfd = signalfd(-1, &mask, 0);
+
+    int flags = fcntl(sigfd, F_GETFL, 0);
+    fcntl(sigfd, F_SETFL, flags | O_NONBLOCK);
+
     if (sigfd < 0) {
         perror("signalfd");
         exit(EXIT_FAILURE);
@@ -359,6 +364,34 @@ void TerminalMultiplexer::run_terminal() {
     event.data.fd = sigfd;
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, sigfd, &event) == -1) {
         perror("epoll_ctl: sigfd");
+        exit(EXIT_FAILURE);
+    }
+
+    // Add timer to doupdates
+    int timerfd = timerfd_create(CLOCK_MONOTONIC, 0);
+
+    if (timerfd < 0) {
+        perror("timerfd_create");
+        exit(EXIT_FAILURE);
+    }
+
+    struct itimerspec timer_value;
+    timer_value.it_value.tv_sec = 0;
+    timer_value.it_value.tv_nsec = DO_UPDATE_MS * 1000000;
+    timer_value.it_interval.tv_sec = timer_value.it_value.tv_sec;
+    timer_value.it_interval.tv_nsec = timer_value.it_value.tv_nsec;
+    if (timerfd_settime(timerfd, 0, &timer_value, NULL) == -1) {
+        perror("timerfd_settime");
+        exit(EXIT_FAILURE);
+    }
+
+    flags = fcntl(timerfd, F_GETFL, 0);
+    fcntl(timerfd, F_SETFL, flags | O_NONBLOCK);
+
+    event.events = EPOLLIN;
+    event.data.fd = timerfd;
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, timerfd, &event) == -1) {
+        perror("epoll_ctl: timerfd");
         exit(EXIT_FAILURE);
     }
 
@@ -392,6 +425,10 @@ void TerminalMultiplexer::run_terminal() {
                 ssize_t s = read(sigfd, &sigfd_info, sizeof(struct signalfd_siginfo));
 
                 if (s != sizeof(struct signalfd_siginfo)) {
+                    if (errno == EAGAIN) {
+                        // Spurious
+                        continue;
+                    }
                     perror("read signalfd");
                     exit(EXIT_FAILURE);
                 }
@@ -403,6 +440,26 @@ void TerminalMultiplexer::run_terminal() {
 
                 // Resize
                 resize();
+            } else if (events[i].data.fd == timerfd) {
+                // Read the timer
+                uint64_t expirations;
+                ssize_t s = read(timerfd, &expirations, sizeof(expirations));
+
+                if (s != sizeof(expirations)) {
+                    if (errno == EAGAIN) {
+                        // Spurious
+                        continue;
+                    }
+                    perror("read timerfd");
+                    exit(EXIT_FAILURE);
+                }
+
+                // Update
+                for (Screen &screen : screens) {
+                    if (screen.consume_refresh()) {
+                        wrefresh(screen.get_window());
+                    }
+                }
             } else {
                 // A PTY
                 for (Screen &screen : screens) {
