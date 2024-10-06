@@ -3,8 +3,8 @@
 #include <cstdlib>
 #include <vector>
 #include <string>
-#include "../include/agency_manager.hpp"
-#include "../include/agency_request_wrapper.hpp"
+#include <agency_manager.hpp>
+#include <agency_request_wrapper.hpp>
 
 class MockAgencyRequestWrapper : public AgencyRequestWrapper {
 public:

@@ -7,8 +7,8 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include "../nlohmann/json.hpp"
-#include "../include/bookmark_manager.hpp"
-#include "../include/agency_manager.hpp"
+#include <bookmark_manager.hpp>
+#include <agency_manager.hpp>
 
 using json = nlohmann::json;
 

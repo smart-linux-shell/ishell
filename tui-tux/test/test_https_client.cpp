@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include "../include/https_client.hpp"
+#include <https_client.hpp>
 
 #include <iostream>
 

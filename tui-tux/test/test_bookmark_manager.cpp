@@ -5,7 +5,7 @@
 #include <sstream>
 #include <fstream>
 #include <unordered_map>
-#include "../include/bookmark_manager.hpp"
+#include <bookmark_manager.hpp>
 #include <readline/history.h>
 
 #define MOCK_BOOKMARS_SIZE 1

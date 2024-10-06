@@ -3,25 +3,25 @@
 
 #include <ncurses.h>
 #include <utility>
+#include <vector>
 
-#include "screen_ring_buffer.hpp"
+#include <escape.hpp>
 
 class Screen {
 public:
     Screen();
-    Screen(int lines, int cols, WINDOW *window, WINDOW *outer, int pty_master, int pid);
-    Screen(int lines, int cols, WINDOW *window, WINDOW *outer, Screen &old_screen);
-    int get_n_lines();
-    int get_n_cols();
-    void write_char(char ch);
-    int move_cursor(int y, int x);
-    int get_x();
-    int get_y();
+    Screen(int lines, int cols, int pty_master, int pid);
+    Screen(int lines, int cols, Screen &old_screen);
+    int get_n_lines() const;
+    int get_n_cols() const;
+    void handle_char(TerminalChar &tch);
+    void write_char(chtype ch);
     void cursor_begin();
     void cursor_return();
     void cursor_back();
     void cursor_forward();
     void cursor_up();
+    int move_cursor(int y, int x);
     void clear();
     void erase(int del_cnt);
     void erase_to_eol();
@@ -29,56 +29,63 @@ public:
     void scroll_down();
     void scroll_up();
     void newline();
-    const WINDOW *get_window();
-    const int get_pty_master();
-    const int get_pid();
+    int get_pty_master() const;
+    int get_pid() const;
+    int get_pad_height() const;
+    WINDOW *get_pad() const;
     void delete_wins();
     void insert_next(int num);
-    void push_right();
-
-    const bool is_in_manual_scroll();
+    int translate_given_x(int x);
+    int translate_given_y(int y);
+    void translate_given_coords(int y, int x, int &new_y, int &new_x);
+    void refresh_screen();
+    void set_screen_coords(int sminy, int sminx, int smaxy, int smaxx);
+    void expand_pad();
+    bool is_in_manual_scroll();
+    void reset_manual_scroll();
     void enter_manual_scroll();
     void manual_scroll_up();
     void manual_scroll_down();
-    void manual_scroll_reset();
 
 private:
     int n_lines, n_cols;
-    bool cursor_wrapped = false;
 
     int pty_master;
     int pid;
 
-    // When window is NULL, use these
-    int fallback_y, fallback_x;
+    int pushing_right = 0;
+    bool cursor_wrapped = false;
 
-    int pushing_right;
+    // Point where pad displaying starts
+    int pad_start = 0;
 
-    WINDOW *window;
-    WINDOW *outer;
+    // Pad manual scrolling (-1 means disabled)
+    int manual_scrolling_start = -1;
 
-    ScreenRingBuffer buffer;
+    int pad_lines;
 
-    void init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *outer, int new_pty_master, int new_pid);
-    void init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *outer, Screen &old_screen);
-    void show_char(int y, int x);
-    std::pair<int, int> show_all_chars();
+    int sminx = -1, sminy = -1;
+    int smaxx = -1, smaxy = -1;
+
+    WINDOW *pad;
+
+    // Keeps track of characters placed by the user
+    std::vector<std::vector<bool>> user_placed;
+
+    // Keeps track of line information. 
+    // - LINE_INFO_UNTOUCHED marks a line that has not been written to yet
+    // - LINE_INFO_UNWRAPPED marks a standalone line
+    // - LINE_INFO_WRAPPED marks that the line is wrapped with the previous
+    std::vector<int> line_info;
+
+    void init(int new_lines, int new_cols, int new_pty_master, int new_pid);
+    void init(int new_lines, int new_cols, Screen &old_screen);
 
 public:
     // Wrappers
-    int srefresh();
-    int sgetx();
-    int sgety();
-    int smove(int y, int x);
-    int sclear();
-    int mvsaddch(int y, int x, chtype ch);
-    int saddch(chtype ch);
-    int sdelch();
-    int sclrtoeol();
-    void scursyncup();
-    int sbkgd(chtype ch);
-    int sbox_outer(chtype ch1, chtype ch2);
-    int srefresh_outer();
+    int waddch(WINDOW *window, const chtype ch);
+    int winsch(WINDOW *window, const chtype ch);
+    int wmove(WINDOW *window, int y, int x);
 };
 
 #endif

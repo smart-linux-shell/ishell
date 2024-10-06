@@ -3,8 +3,8 @@
 
 #include <vector>
 
-#include "screen.hpp"
-#include "utils.hpp"
+#include <screen.hpp>
+#include <utils.hpp>
 
 class TerminalMultiplexer {
 public:
@@ -20,6 +20,7 @@ private:
     bool zoomed_in = false;
     
     std::vector<Screen> screens;
+    std::vector<WINDOW *> windows;
 
     void init();
     void init_nc();
