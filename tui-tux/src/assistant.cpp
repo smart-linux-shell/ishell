@@ -47,6 +47,10 @@ void assistant() {
             } else if (bookmark_manager.is_remove_flag(option)) {
                 // Remove bookmark
                 bookmark_manager.remove_bookmark(alias);
+            } else if (input_str == "clear") {
+                add_history(input);
+                session_history.clear();
+                std::cout << "Cleared session history.\n\n";
             } else {
                 // New query to assistant
                 add_history(input);
