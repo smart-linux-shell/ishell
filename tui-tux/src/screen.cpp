@@ -372,8 +372,6 @@ void Screen::init(int new_lines, int new_cols, int new_pty_master, int new_pid) 
 void Screen::init(int new_lines, int new_cols, Screen &old_screen) {
     init(new_lines, new_cols, old_screen.pty_master, old_screen.pid);
 
-    pad_lines = old_screen.pad_lines;
-
     bool first = true;
 
     int old_y = getcury(old_screen.pad);
