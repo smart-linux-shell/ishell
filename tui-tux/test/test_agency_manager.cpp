@@ -8,7 +8,7 @@
 
 class MockAgencyRequestWrapper : public AgencyRequestWrapper {
 public:
-    MOCK_METHOD(std::string, ask_agent, (const std::string& url, const std::string& query), (override));
+    MOCK_METHOD(std::string, ask_agent, (const std::string& url, const std::string& query, (std::vector<std::pair<std::string, std::string>> &session_history)), (override));
 };
 
 class AgencyManagerTest : public ::testing::Test {
@@ -75,7 +75,7 @@ TEST_F(AgencyManagerTest, ExecuteQuery_SuccessfullyCallsAgent) {
     // arrange
     setenv("ISHELL_AGENCY_URL", "http://localhost:5000", 1);
     agency_manager.get_agency_url();
-    EXPECT_CALL(mock_request_wrapper, ask_agent("http://localhost:5000/assistant", "test query"))
+    EXPECT_CALL(mock_request_wrapper, ask_agent("http://localhost:5000/assistant", "test query", session_history))
         .WillOnce(::testing::Return("agent response"));
     // act
     std::string result = agency_manager.execute_query("test query", session_history);
@@ -88,7 +88,7 @@ TEST_F(AgencyManagerTest, ExecuteQuery_AddsToSessionHistory) {
     // arrange
     setenv("ISHELL_AGENCY_URL", "http://localhost:5000", 1);
     agency_manager.get_agency_url();
-    EXPECT_CALL(mock_request_wrapper, ask_agent("http://localhost:5000/assistant", "test query"))
+    EXPECT_CALL(mock_request_wrapper, ask_agent("http://localhost:5000/assistant", "test query", session_history))
         .WillOnce(::testing::Return("agent response"));
     // act
     std::string result = agency_manager.execute_query("test query", session_history);
@@ -103,7 +103,7 @@ TEST_F(AgencyManagerTest, ExecuteQuery_AskAgentFails) {
     // arrange
     setenv("ISHELL_AGENCY_URL", "http://localhost:5000", 1);
     agency_manager.get_agency_url();
-    EXPECT_CALL(mock_request_wrapper, ask_agent("http://localhost:5000/assistant", "test query"))
+    EXPECT_CALL(mock_request_wrapper, ask_agent("http://localhost:5000/assistant", "test query", session_history))
         .WillOnce(::testing::Return(""));
     // act
     std::string result = agency_manager.execute_query("test query", session_history);

@@ -41,6 +41,8 @@ protected:
 
     std::string url = "0.0.0.1";
     std::string query = "Test Query";
+
+    std::vector<std::pair<std::string, std::string>> session_history;
 };
 
 // Test case: Successfully creates a request with the correct data fields (distro, installed_packages, query, ssh_ip, ssh_port, ssh_user).
@@ -62,7 +64,8 @@ TEST_F(AgencyRequestWrapperTest, CorrectRequestData) {
         {"query", query},
         {"ssh_ip", ssh_ip},
         {"ssh_port", ssh_port},
-        {"ssh_user", ssh_user}
+        {"ssh_user", ssh_user},
+        {"session_history", ""}
     };
 
     json body = {
@@ -79,7 +82,7 @@ TEST_F(AgencyRequestWrapperTest, CorrectRequestData) {
         .WillOnce(Return(response));
 
     // Call
-    mock_agency_request_wrapper1.send_request_to_agent_server(url, query);
+    mock_agency_request_wrapper1.send_request_to_agent_server(url, query, session_history);
 };
 
 // Test case: Handles the case where one or more fields are empty.
@@ -109,7 +112,7 @@ TEST_F(AgencyRequestWrapperTest, EmptyFields) {
         .WillOnce(DoAll(SaveArg<3>(&request), Return(response)));
 
     // Call
-    mock_agency_request_wrapper2.send_request_to_agent_server(url, query);
+    mock_agency_request_wrapper2.send_request_to_agent_server(url, query, session_history);
 
     // Assert
     EXPECT_TRUE(request.contains("ssh_ip"));
@@ -152,7 +155,7 @@ TEST_F(AgencyRequestWrapperTest, CorrectHeaders) {
         .WillOnce(Return(response));
 
     // Call
-    mock_agency_request_wrapper1.send_request_to_agent_server(url, query);
+    mock_agency_request_wrapper1.send_request_to_agent_server(url, query, session_history);
 }
 
 // Test case: Successfully retrieves content from the server response when the request is successful.
@@ -184,7 +187,7 @@ TEST_F(AgencyRequestWrapperTest, SuccessfulRequest) {
         .WillOnce(Return(response));
 
     // Call
-    std::string agent_response = mock_agency_request_wrapper1.ask_agent(url, query);
+    std::string agent_response = mock_agency_request_wrapper1.ask_agent(url, query, session_history);
 
     // Assert
     EXPECT_EQ(agent_response, response_content);
@@ -218,7 +221,7 @@ TEST_F(AgencyRequestWrapperTest, ResponseError) {
     internal::CaptureStderr();
 
     // Call
-    mock_agency_request_wrapper1.ask_agent(url, query);
+    mock_agency_request_wrapper1.ask_agent(url, query, session_history);
 
     std::string result_err = internal::GetCapturedStderr();
 
@@ -254,7 +257,7 @@ TEST_F(AgencyRequestWrapperTest, ResponseNoContent) {
     internal::CaptureStderr();
 
     // Call
-    mock_agency_request_wrapper1.ask_agent(url, query);
+    mock_agency_request_wrapper1.ask_agent(url, query, session_history);
 
     std::string result_err = internal::GetCapturedStderr();
 
@@ -290,7 +293,7 @@ TEST_F(AgencyRequestWrapperTest, ValidJSON) {
         .WillOnce(Return(response));
 
     // Call
-    json result = mock_agency_request_wrapper1.send_request_to_agent_server(url, query);
+    json result = mock_agency_request_wrapper1.send_request_to_agent_server(url, query, session_history);
 
     EXPECT_TRUE(result.contains("body") && result["body"].contains("content") && result["body"]["content"] == "Test JSON");
 };
