@@ -18,7 +18,9 @@ private:
     int focus = FOCUS_NULL;
     bool waiting_for_command = false;
     bool zoomed_in = false;
-    
+
+    WINDOW *bottom_bar = NULL, *middle_divider = NULL;
+
     std::vector<Screen> screens;
     std::vector<WINDOW *> windows;
 
