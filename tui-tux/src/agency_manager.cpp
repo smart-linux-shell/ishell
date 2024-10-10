@@ -23,7 +23,7 @@ std::string AgencyManager::execute_query(const std::string &query, std::vector<s
         std::cerr << "ISHELL_AGENCY_URL not set\n";
         return "";
     }
-    std::string result = request_wrapper->ask_agent(assistant_url, query);
+    std::string result = request_wrapper->ask_agent(assistant_url, query, session_history);
     session_history.push_back({query, result});
     return result;
 }

@@ -63,17 +63,19 @@ std::string AgencyRequestWrapper::get_ssh_user() {
 }
 
 // Function to send request to agent's server
-json AgencyRequestWrapper::send_request_to_agent_server(const std::string& url, const std::string& user_query) {
+json AgencyRequestWrapper::send_request_to_agent_server(const std::string& url, const std::string& user_query, std::vector<std::pair<std::string, std::string>> &session_history) {
     std::string distro = get_linux_distro();
     std::vector<std::string> installed_packages = get_installed_packages();
     std::string ssh_ip = get_ssh_ip();
     int ssh_port = get_ssh_port();
     std::string ssh_user = get_ssh_user();
+    std::string history = get_session_history_string(session_history);
 
     json request_body = {
         {"distro", distro},
         {"installed_packages", installed_packages},
         {"query", user_query},
+        {"session_history", history},
         {"ssh_ip", ssh_ip},
         {"ssh_port", ssh_port},
         {"ssh_user", ssh_user}
@@ -89,8 +91,8 @@ json AgencyRequestWrapper::send_request_to_agent_server(const std::string& url, 
 }
 
 // Wrapper prep function for request for agent
-std::string AgencyRequestWrapper::ask_agent(const std::string& url, const std::string& user_query) {
-    json response = send_request_to_agent_server(url, user_query);
+std::string AgencyRequestWrapper::ask_agent(const std::string& url, const std::string& user_query, std::vector<std::pair<std::string, std::string>> &session_history) {
+    json response = send_request_to_agent_server(url, user_query, session_history);
 
     if (response.contains("error")) {
         std::cerr << "Request failed: " << response["error"] << std::endl;
@@ -117,4 +119,12 @@ json AgencyRequestWrapper::make_http_request(HttpRequestType request_type, const
 
 char *AgencyRequestWrapper::getenv(const char *key) {
     return std::getenv(key);
+}
+
+std::string AgencyRequestWrapper::get_session_history_string(std::vector<std::pair<std::string, std::string>> &session_history) {
+    std::ostringstream history_stream;
+    for (const auto &pair : session_history) {
+        history_stream << "Query: " << pair.first << "\nAnswer: " << pair.second << "\n";
+    }
+    return history_stream.str();
 }
