@@ -112,15 +112,15 @@ void Screen::clear() {
     srefresh();
 }
 
-void Screen::erase_in_place() {
+void Screen::erase(int del_cnt) {
     int curx = get_x();
     int cury = get_y();
     
-    buffer.add_char(cury, curx, 0);
+    for (int i = 0; i < del_cnt; i++) {
+        buffer.push_left(cury, curx);
+    }
 
-    sdelch();
-
-    srefresh();
+    show_all_chars();
 }
 
 void Screen::erase_to_eol() {
@@ -214,6 +214,40 @@ void Screen::push_right() {
     int curx = sgetx();
 
     buffer.push_right(cury, curx);
+}
+
+const bool Screen::is_in_manual_scroll() {
+    return buffer.is_in_manual_scroll();
+}
+
+void Screen::enter_manual_scroll() {
+    buffer.enter_manual_scroll();
+}
+
+void Screen::manual_scroll_up() {
+    if (sgety() > 0) {
+        smove(sgety() - 1, sgetx());
+        srefresh();
+    } else {
+        buffer.manual_scroll_up();
+        show_all_chars();
+    }
+}
+
+void Screen::manual_scroll_down() {
+    if (sgety() < n_lines - 1) {
+        smove(sgety() + 1, sgetx());
+        srefresh();
+    } else {
+        buffer.manual_scroll_down();
+        show_all_chars();
+    }
+}
+
+void Screen::manual_scroll_reset() {
+    buffer.manual_scroll_reset();
+    std::pair<int, int> pair = show_all_chars();
+    move_cursor(pair.second, pair.first);
 }
 
 void Screen::init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *new_outer, int new_pty_master, int new_pid) {

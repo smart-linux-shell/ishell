@@ -23,7 +23,7 @@ public:
     void cursor_forward();
     void cursor_up();
     void clear();
-    void erase_in_place();
+    void erase(int del_cnt);
     void erase_to_eol();
     void cursor_down();
     void scroll_down();
@@ -35,6 +35,12 @@ public:
     void delete_wins();
     void insert_next(int num);
     void push_right();
+
+    const bool is_in_manual_scroll();
+    void enter_manual_scroll();
+    void manual_scroll_up();
+    void manual_scroll_down();
+    void manual_scroll_reset();
 
 private:
     int n_lines, n_cols;
