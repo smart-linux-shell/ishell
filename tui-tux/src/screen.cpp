@@ -1,83 +1,159 @@
 #include <ncurses.h>
 
-#include "../include/screen_ring_buffer.hpp"
-
-#include "../include/screen.hpp"
+#include <screen.hpp>
+#include <utils.hpp>
 
 Screen::Screen() {}
 
-Screen::Screen(int lines, int cols, WINDOW *window, WINDOW *outer, int pty_master, int pid) {
-    init(lines, cols, window, outer, pty_master, pid);
+Screen::Screen(int lines, int cols, int pty_master, int pid) {
+    init(lines, cols, pty_master, pid);
 }
 
-Screen::Screen(int lines, int cols, WINDOW *window, WINDOW *outer, Screen &old_screen) {
-    init(lines, cols, window, outer, old_screen);
+Screen::Screen(int lines, int cols, Screen &old_screen) {
+    init(lines, cols, old_screen);
 }
 
-int Screen::get_n_lines() {
+int Screen::get_n_lines() const {
     return n_lines;
 }
 
-int Screen::get_n_cols() {
+int Screen::get_n_cols() const {
     return n_cols;
 }
 
-void Screen::write_char(char ch) {
+void Screen::handle_char(TerminalChar &tch) {
+    // CR
+    if (tch.ch == '\r') {
+        cursor_return();
+    } else if (tch.ch == '\n') {
+        newline();
+    } else if (tch.ch == KEY_BEL) {
+        // BEL (ignore)
+    } else if (tch.ch == KEY_SI) {
+        // Disable alt charset (ignore)
+    } else if (tch.ch == KEY_BS) {
+        // BKSP
+        cursor_back();
+    } else if (tch.ch > 255) {
+        if (tch.ch == E_KEY_CLEAR) {
+            clear();
+        } else if (tch.ch == E_KEY_DCH) {
+            int del_cnt = 1;
+            if (tch.args.size() == 1) {
+                del_cnt = tch.args[0];
+            }
+            erase(del_cnt);
+        } else if (tch.ch == E_KEY_EL) {
+            erase_to_eol();
+        } else if (tch.ch == E_KEY_CUP) {
+            int y = 1;
+            int x = 1;
+            if (tch.args.size() == 2) {
+                y = tch.args[0];
+                x = tch.args[1];
+            }
+
+            int new_y, new_x;
+            translate_given_coords(y, x, new_y, new_x);
+            move_cursor(new_y, new_x);
+        } else if (tch.ch == E_KEY_VPA) {
+            int y = 1;
+            if (tch.args.size() == 1) {
+                y = tch.args[0];
+            }
+
+            move_cursor(translate_given_y(y), getcurx(pad));
+        } else if (tch.ch == E_KEY_CUB) {
+            int x_offs = 1;
+            if (tch.args.size() == 1) {
+                x_offs = tch.args[0];
+            }
+
+            move_cursor(getcury(pad), getcurx(pad) - x_offs);
+        } else if (tch.ch == E_KEY_CUF) {
+            int x_offs = 1;
+            if (tch.args.size() == 1) {
+                x_offs = tch.args[0];
+            }
+
+            move_cursor(getcury(pad), getcurx(pad) + x_offs);
+        } else if (tch.ch == E_KEY_CUU) {
+            int y_offs = 1;
+            if (tch.args.size() == 1) {
+                y_offs = tch.args[0];
+            }
+
+            move_cursor(getcury(pad) - y_offs, getcurx(pad));
+        } else if (tch.ch == E_KEY_CUD) {
+            int y_offs = 1;
+            if (tch.args.size() == 1) {
+                y_offs = tch.args[0];
+            }
+
+            move_cursor(getcury(pad) + y_offs, getcurx(pad));
+        } else if (tch.ch == E_KEY_RI) {
+            scroll_up();
+        } else if (tch.ch == E_KEY_ICH) {
+            int num = 1;
+            if (tch.args.size() == 1) {
+                num = tch.args[0];
+            }
+            insert_next(num);
+        }
+    } else if (tch.ch > 0 && tch.ch < 256) {
+        write_char(tch.ch);
+    }
+}
+
+void Screen::write_char(chtype ch) {
     bool inserting = false;
 
-    int curx = sgetx();
-    int cury = sgety();
+    int y = getcury(pad);
+    int x = getcurx(pad);
 
     if (pushing_right > 0) {
-        push_right();
         pushing_right--;
         inserting = true;
     }
 
-    if (!cursor_wrapped) {
-        buffer.add_char(cury, curx, ch);
-        if (curx == n_cols - 1) {
-            cursor_wrapped = true;
-        }
-    } else {
-        curx = 0;
-        cury++;
-        if (cury == n_lines) {
-            cury--;
-            scroll_down();
-        }
-        buffer.add_char(cury, curx, ch);
-        cursor_wrapped = false;
-    }
-
     if (inserting) {
-        show_all_chars();
-    } else {
-        show_char(cury, curx);
-    }
-    
-    smove(cury, curx + 1);
-}
+        winsch(pad, ch);
 
-int Screen::move_cursor(int y, int x) {
-    int rc = smove(y, x);
+        // Set user placed true at the end of the chain
+        for (int i = x; i < n_cols; i++) {
+            if (!user_placed[y][i]) {
+                user_placed[y][i] = true;
+                break;
+            }
+        }
 
-    if (rc == ERR) {
-        return rc;
     }
 
-    cursor_wrapped = false;
-    srefresh();
+    if (cursor_wrapped) {
+        // Do not overwrite
+        chtype orig_ch = mvwinch(pad, y, x);
+        waddch(pad, orig_ch);
+    }
 
-    return rc;
-}
+    y = getcury(pad);
+    x = getcurx(pad);
+    user_placed[y][x] = true;
+    waddch(pad, ch);
 
-int Screen::get_x() {
-    return sgetx();
-}
+    if (!cursor_wrapped && x == n_cols - 1) {
+        move_cursor(y, x);
+        cursor_wrapped = true;
+    } else if (cursor_wrapped) {
+        cursor_wrapped = false;
+        if (x == 0) {
+            // Mark as wrapped
+            line_info[y] = LINE_INFO_WRAPPED;
+        }
+    }
 
-int Screen::get_y() {
-    return sgety();
+    while (getcury(pad) > pad_start + n_lines - 1) {
+        scroll_down();
+    }
 }
 
 void Screen::cursor_begin() {
@@ -85,123 +161,162 @@ void Screen::cursor_begin() {
 }
 
 void Screen::cursor_return() {
-    move_cursor(get_y(), 0);
+    move_cursor(getcury(pad), 0);
 }
 
 void Screen::cursor_back() {
-    move_cursor(get_y(), get_x() - 1);
+    move_cursor(getcury(pad), getcurx(pad) - 1);
 }
 
 void Screen::cursor_forward() {
-    move_cursor(get_y(), get_x() + 1);
+    move_cursor(getcury(pad), getcurx(pad) + 1);
 }
 
 void Screen::cursor_up() {
-    int rc = move_cursor(get_y() - 1, get_x());
+    int rc = move_cursor(getcury(pad) - 1, getcurx(pad));
 
-    if (rc == ERR) {
-        scroll_up();
+    if (rc != ERR) {
+        while (getcury(pad) < pad_start) {
+            scroll_up();
+        }
     }
+}
+
+int Screen::move_cursor(int y, int x) {
+    int rc = wmove(pad, y, x);
+
+    if (rc != ERR) {
+        cursor_wrapped = false;
+    }
+
+    return rc;
 }
 
 void Screen::clear() {
-    buffer.clear();
+    user_placed = std::vector<std::vector<bool>>(pad_lines, std::vector<bool>(n_cols, false));
+    line_info = std::vector<int>(pad_lines, LINE_INFO_UNTOUCHED);
 
-    sclear();
-    cursor_wrapped = false;
-    srefresh();
+    wclear(pad);
+    pad_start = 0;
 }
 
-void Screen::erase(int del_cnt) {
-    int curx = get_x();
-    int cury = get_y();
-    
+void Screen::erase(int del_cnt) {    
     for (int i = 0; i < del_cnt; i++) {
-        buffer.push_left(cury, curx);
-    }
+        wdelch(pad);
 
-    show_all_chars();
+        // Set user placed false at the end of the chain
+        int y = getcury(pad);
+        int x = getcurx(pad);
+        bool found = false;
+
+        for (int j = x; j < n_cols - 1 && found; j++) {
+            if (!user_placed[y][j + 1]) {
+                found = true;
+                user_placed[y][j] = false;
+            } 
+        }
+
+        if (!found) {
+            user_placed[y][n_cols - 1] = false;
+        }
+    }
 }
 
 void Screen::erase_to_eol() {
-    int curx = get_x();
-    int cury = get_y();
+    wclrtoeol(pad);
 
-    for (int i = curx; i < n_cols; i++) {
-        buffer.add_char(cury, i, 0);
+    // Set all user placed false
+    int y = getcury(pad);
+    int x = getcurx(pad);
+    for (int i = x; i < n_cols; i++) {
+        user_placed[y][i] = false;
     }
-
-    sclrtoeol();
-
-    srefresh();
 }
 
 void Screen::cursor_down() {
-    int rc = move_cursor(sgety() + 1, sgetx());
+    move_cursor(getcury(pad) + 1, getcurx(pad));
     
-    if (rc == ERR) {
+    while (getcury(pad) > pad_start + n_lines - 1) {
         scroll_down();
     }
 }
 
-void Screen::scroll_down() {
-    // Preserve
-    int cury = sgety();
-    int curx = sgetx();
-    sclear();
-    smove(cury, curx);
+// Translates coords passed in escape coords to pad coords.
+int Screen::translate_given_x(int x) {
+    if (x < 1) {
+        return 0;
+    }
 
-    buffer.scroll_down();
+    if (x > n_cols) {
+        return (n_cols - 1);
+    }
 
-    // Redraw
-    show_all_chars();
+    return (x - 1);
+}
 
-    erase_to_eol();
+int Screen::translate_given_y(int y) {
+    if (y < 1) {
+        return pad_start;
+    }
+
+    if (y > n_lines) {
+        return pad_start + (n_lines - 1);
+    }
+
+    return pad_start + y - 1;
+}
+
+void Screen::translate_given_coords(int y, int x, int &new_y, int &new_x) {
+    new_x = translate_given_x(x);
+    new_y = translate_given_y(y);
 }
 
 void Screen::scroll_up() {
-    int cury = sgety();
-    int curx = sgetx();
-    sclear();
-    smove(cury, curx);
-    
-    buffer.scroll_up();
+    if (pad_start > 0) {
+        pad_start--;
+        int y = getcury(pad);
+        int x = getcurx(pad);
 
-    // Redraw
-    show_all_chars();
+        wmove(pad, pad_start, 0);
+        erase_to_eol();
+        wmove(pad, y, x);
+    }
+}
 
-    erase_to_eol();
+void Screen::scroll_down() {
+    if (pad_start + n_lines < pad_lines) {
+        pad_start++;
+    }
 }
 
 void Screen::newline() {
-    int cury = sgety();
-    
-    buffer.new_line(cury);
+    int y = getcury(pad);
+    if (line_info[y] == LINE_INFO_UNTOUCHED) {
+        line_info[y] = LINE_INFO_UNWRAPPED;
+    }
+
+    cursor_return();
     cursor_down();
-
-    srefresh();
 }
 
-const WINDOW *Screen::get_window() {
-    return window;
+WINDOW *Screen::get_pad() const {
+    return pad;
 }
 
-const int Screen::get_pty_master() {
+int Screen::get_pty_master() const {
     return pty_master;
 }
 
-const int Screen::get_pid() {
+int Screen::get_pid() const {
     return pid;
 }
 
-void Screen::delete_wins() {
-    if (window != NULL) {
-        delwin(window);
-    }
+int Screen::get_pad_height() const {
+    return pad_lines;
+}
 
-    if (outer != NULL) {
-        delwin(outer);
-    }
+void Screen::delete_wins() {
+    delwin(pad);
 }
 
 // Next num characters will be inserted.
@@ -209,280 +324,185 @@ void Screen::insert_next(int num) {
     pushing_right = num;
 }
 
-void Screen::push_right() {
-    int cury = sgety();
-    int curx = sgetx();
+void Screen::refresh_screen() {
+    int start = pad_start;
 
-    buffer.push_right(cury, curx);
+    if (manual_scrolling_start != -1) {
+        start = manual_scrolling_start;
+    }
+
+    if (sminy != -1 && sminx != -1 && smaxy != -1 && smaxx != -1) {
+        prefresh(pad, start, 0, sminy, sminx, smaxy, smaxx);
+    }
 }
 
-const bool Screen::is_in_manual_scroll() {
-    return buffer.is_in_manual_scroll();
+void Screen::set_screen_coords(int sminy, int sminx, int smaxy, int smaxx) {
+    this->sminy = sminy;
+    this->sminx = sminx;
+    this->smaxy = smaxy;
+    this->smaxx = smaxx;
+}
+
+void Screen::expand_pad() {
+    // Resize
+    pad_lines += INITIAL_PAD_HEIGHT;
+    wresize(pad, pad_lines, n_cols);
+    std::vector<std::vector<bool>> user_placed_ext = std::vector<std::vector<bool>>(INITIAL_PAD_HEIGHT, std::vector<bool>(n_cols, false));
+    std::vector<bool> line_info_ext = std::vector<bool>(INITIAL_PAD_HEIGHT, false);
+
+    user_placed.insert(user_placed.end(), user_placed_ext.begin(), user_placed_ext.end());
+    line_info.insert(line_info.end(), line_info_ext.begin(), line_info_ext.end());
+}
+
+void Screen::init(int new_lines, int new_cols, int new_pty_master, int new_pid) {
+    n_lines = new_lines;
+    n_cols = new_cols;
+    pty_master = new_pty_master;
+    pid = new_pid;
+    pushing_right = 0;
+    manual_scrolling_start = -1;
+
+    pad_lines = INITIAL_PAD_HEIGHT;
+    pad = newpad(pad_lines, n_cols);
+
+    user_placed = std::vector<std::vector<bool>>(pad_lines, std::vector<bool>(new_cols, false));
+    line_info = std::vector<int>(pad_lines, LINE_INFO_UNTOUCHED);
+}
+
+void Screen::init(int new_lines, int new_cols, Screen &old_screen) {
+    init(new_lines, new_cols, old_screen.pty_master, old_screen.pid);
+
+    bool first = true;
+
+    int old_y = getcury(old_screen.pad);
+    int old_x = getcurx(old_screen.pad);
+
+    int new_y = -1;
+    int new_x = -1;
+
+    // Transfer old data
+    std::vector<chtype> current;
+
+    for (int i = 0; i < old_screen.pad_lines; i++) {
+        // Skip untouched lines
+        if (old_screen.line_info[i] == LINE_INFO_UNTOUCHED) {
+            continue;
+        }
+
+        // Not wrapped to previous line
+        if (old_screen.line_info[i] == LINE_INFO_UNWRAPPED) {
+            if (first) {
+                first = false;
+            } else {
+                current.clear();
+                newline();
+            }
+        }
+
+        for (int j = 0; j < old_screen.n_cols; j++) {
+            if (i == old_y && j == old_x) {
+                // Translate cursor position
+                new_y = getcury(pad);
+                new_x = getcurx(pad);
+            }
+
+            chtype ch = mvwinch(old_screen.pad, i, j);
+            current.push_back(ch);
+            if (old_screen.user_placed[i][j]) {
+                // Write everything found so far and reset
+                for (chtype ch1 : current) {
+                    write_char(ch1);
+                }
+
+                current.clear();
+            }
+        }
+    }
+
+    // Reset cursor
+    if (new_y != -1 && new_x != -1) {
+        wmove(pad, new_y, new_x);
+    }
+}
+
+bool Screen::is_in_manual_scroll() {
+    return (manual_scrolling_start != -1);
+}
+
+void Screen::reset_manual_scroll() {
+    manual_scrolling_start = -1;
 }
 
 void Screen::enter_manual_scroll() {
-    buffer.enter_manual_scroll();
+    manual_scrolling_start = pad_start;
 }
 
 void Screen::manual_scroll_up() {
-    if (sgety() > 0) {
-        smove(sgety() - 1, sgetx());
-        srefresh();
-    } else {
-        buffer.manual_scroll_up();
-        show_all_chars();
+    if (is_in_manual_scroll() && manual_scrolling_start > 0) {
+        manual_scrolling_start--;
     }
 }
 
 void Screen::manual_scroll_down() {
-    if (sgety() < n_lines - 1) {
-        smove(sgety() + 1, sgetx());
-        srefresh();
-    } else {
-        buffer.manual_scroll_down();
-        show_all_chars();
+    if (is_in_manual_scroll() && manual_scrolling_start < pad_start) {
+        manual_scrolling_start++;
     }
-}
-
-void Screen::manual_scroll_reset() {
-    buffer.manual_scroll_reset();
-    std::pair<int, int> pair = show_all_chars();
-    move_cursor(pair.second, pair.first);
-}
-
-void Screen::init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *new_outer, int new_pty_master, int new_pid) {
-    n_lines = new_lines;
-    n_cols = new_cols;
-    window = new_window;
-    outer = new_outer;
-    buffer = ScreenRingBuffer(new_lines, new_cols, 1024);
-    pty_master = new_pty_master;
-    pid = new_pid;
-    pushing_right = 0;
-
-    if (window == NULL) {
-        fallback_x = 0;
-        fallback_y = 0;
-    }
-}
-
-void Screen::init(int new_lines, int new_cols, WINDOW *new_window, WINDOW *new_outer, Screen &old_screen) {
-    init(new_lines, new_cols, new_window, new_outer, old_screen.pty_master, old_screen.pid);
-
-    buffer = ScreenRingBuffer(new_lines, new_cols, 1024, old_screen.buffer);
-
-    // Draw text
-    std::pair<int, int> pair = show_all_chars();
-    smove(pair.second, pair.first);
-}
-
-void Screen::show_char(int y, int x) {
-    // Preserve
-    int curx = sgetx();
-    int cury = sgety();
-
-    char ch = buffer.get_char(y, x);
-
-    if (ch == 0) {
-        ch = ' ';
-    }
-
-    mvsaddch(y, x, ch);
-    smove(cury, curx);
-    srefresh();
-}
-
-// Returns where the cursor should be (no more chars after it)
-std::pair<int, int> Screen::show_all_chars() {
-    // Preserve
-    int curx = sgetx();
-    int cury = sgety();
-
-    std::pair<int, int> pair;
-    pair.first = -1;
-    pair.second = -1;
-
-    sclear();
-
-    for (int i = 0; i < n_lines; i++) {
-        for (int j = 0; j < n_cols; j++) {
-            char ch = buffer.get_char(i, j);
-            if (ch == 0) {
-                ch = ' ';
-            } else {
-                pair.first = j;
-                pair.second = i;
-            }
-
-            mvsaddch(i, j, ch);
-        }
-    }
-
-    if (pair.first == -1 && pair.second == -1) {
-        pair.first = 0;
-        pair.second = 0;
-    } else if (buffer.has_new_line(pair.second)) {
-        pair.first = 0;
-        pair.second++;
-    } else if (pair.first < n_cols - 1) {
-        pair.first++;
-    }
-
-    smove(cury, curx);
-    srefresh();
-
-    return pair;
 }
 
 // Wrappers
-int Screen::srefresh() {
-    if (window != NULL) {
-        return wrefresh(window);
+int Screen::waddch(WINDOW *window, const chtype ch) {
+    // Mark line as touched
+    int y = getcury(pad);
+    if (line_info[y] == LINE_INFO_UNTOUCHED) {
+        line_info[y] = LINE_INFO_UNWRAPPED;
     }
 
-    return OK;
-}
+    // Expand if out of bounds
+    int rc;
 
-int Screen::sgetx() {
-    if (window != NULL) {
-        return getcurx(window);
-    }
-
-    return fallback_x;
-}
-
-int Screen::sgety() {
-    if (window != NULL) {
-        return getcury(window);
-    }
-
-    return fallback_y;
-}
-
-int Screen::smove(int y, int x) {
-    if (window != NULL) {
-        return wmove(window, y, x);
-    }
-
-    if (x < 0 || x >= n_cols || y < 0 || y >= n_lines) {
-        return ERR;
-    }
-
-    fallback_y = y;
-    fallback_x = x;
-
-    return OK;
-}
-
-int Screen::sclear() {
-    if (window != NULL) {
-        return wclear(window);
-    }
-
-    fallback_y = 0;
-    fallback_x = 0;
-
-    return OK;
-}
-
-int Screen::mvsaddch(int y, int x, chtype ch) {
-    if (window != NULL) {
-        return mvwaddch(window, y, x, ch);
-    }
-
-    if (x < 0 || x >= n_cols || y < 0 || y >= n_lines) {
-        return ERR;
-    }
-
-    fallback_x = x;
-    fallback_y = y;
-
-    if (fallback_x < n_cols - 1 || fallback_y < n_lines - 1) {
-        fallback_x++;
-
-        if (fallback_x == n_cols) {
-            fallback_x = 0;
-            fallback_y++;
+    while (1) {
+        rc = ::waddch(window, ch);
+        if (rc != ERR) {
+            break;
         }
-    } else {
-        return ERR;
+        expand_pad();
     }
 
-    return OK;
+    return rc;
 }
 
-int Screen::saddch(chtype ch) {
-    if (window != NULL) {
-        return waddch(window, ch);
+int Screen::winsch(WINDOW *window, const chtype ch) {
+    // Mark line as touched
+    int y = getcury(pad);
+    if (line_info[y] == LINE_INFO_UNTOUCHED) {
+        line_info[y] = LINE_INFO_UNWRAPPED;
     }
 
-    if (fallback_x < n_cols - 1 || fallback_y < n_lines - 1) {
-        fallback_x++;
+    // Expand if out of bounds
+    int rc;
 
-        if (fallback_x == n_cols) {
-            fallback_x = 0;
-            fallback_y++;
+    while (1) {
+        rc = ::winsch(window, ch);
+        if (rc != ERR) {
+            break;
         }
-    } else {
-        return ERR;
+        expand_pad();
     }
 
-    return OK;
+    return rc;
 }
 
-int Screen::sdelch() {
-    if (window != NULL) {
-        return wdelch(window);
+int Screen::wmove(WINDOW *window, int y, int x) {
+    // Expand if out of bounds
+    int rc;
+
+    while (1) {
+        rc = ::wmove(window, y, x);
+        if (rc != ERR) {
+            break;
+        }
+        expand_pad();
     }
 
-    fallback_x--;
-    if (fallback_x < 0) {
-        fallback_x = n_cols - 1;
-        fallback_y --;
-    }
-
-    if (fallback_y < 0) {
-        fallback_x = 0;
-        fallback_y = 0;
-    }
-
-    return OK;
-}
-
-int Screen::sclrtoeol() {
-    if (window != NULL) {
-        return wclrtoeol(window);
-    }
-
-    return OK;
-}
-
-void Screen::scursyncup() {
-    if (window != NULL) {
-        wcursyncup(window);
-    }
-}
-
-int Screen::sbkgd(chtype ch) {
-    if (window != NULL) {
-        return wbkgd(window, ch);
-    }
-
-    return OK;
-}
-
-int Screen::sbox_outer(chtype ch1, chtype ch2) {
-    if (outer != NULL) {
-        return box(outer, ch1, ch2);
-    }
-
-    return OK;
-}
-
-int Screen::srefresh_outer() {
-    if (outer != NULL) {
-        return wrefresh(outer);
-    }
-
-    return OK;
+    return rc;
 }

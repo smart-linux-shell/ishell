@@ -4,8 +4,6 @@
 #include <string>
 #include <vector>
 
-#include "../include/screen.hpp"
-
 // Check `infocmp linux-m`
 
 #define E_KEY_CLEAR 256

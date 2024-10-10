@@ -27,6 +27,13 @@ if ! [ -f "$JSON_DIR/json.hpp" ]; then
     wget https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp -O "$JSON_DIR/json.hpp"
 fi
 
+echo "Checking for ishell-m..."
+infocmp ishell-m 1>/dev/null 2>/dev/null
+if [ $? != 0 ]; then
+    echo "Installing ishell-m..."
+    tic ishell-m.info || exit
+fi
+
 if [ -d "$PROJECT_DIR" ]; then
     cd "$PROJECT_DIR" || exit
 else

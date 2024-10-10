@@ -3,8 +3,8 @@
 #include <unistd.h>
 #include <unordered_map>
 
-#include "../include/screen.hpp"
-#include "../include/escape.hpp"
+#include <screen.hpp>
+#include <escape.hpp>
 
 #define READ_BUFSIZ 1024
 

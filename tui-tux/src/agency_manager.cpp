@@ -1,6 +1,6 @@
 #include <cstdlib>
 #include <iostream>
-#include "../include/agency_manager.hpp"
+#include <agency_manager.hpp>
 
 AgencyManager::AgencyManager(AgencyRequestWrapper* request_wrapper)
     : agency_url_set(false), request_wrapper(request_wrapper) {

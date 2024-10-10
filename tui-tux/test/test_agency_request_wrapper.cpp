@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include "../include/agency_request_wrapper.hpp"
-#include "../include/https_client.hpp"
+#include <agency_request_wrapper.hpp>
+#include <https_client.hpp>
 
 using namespace testing;
 

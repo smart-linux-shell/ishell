@@ -3,7 +3,7 @@
 #include <vector>
 #include <stdlib.h>
 
-#include "../include/escape.hpp"
+#include <escape.hpp>
 
 class EscapeTest : public ::testing::Test {};
 

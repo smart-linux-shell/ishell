@@ -9,12 +9,12 @@
 #include <errno.h>
 #include <string>
 
-#include "../include/screen.hpp"
-#include "../include/utils.hpp"
-#include "../include/assistant.hpp"
-#include "../include/escape.hpp"
+#include <screen.hpp>
+#include <utils.hpp>
+#include <assistant.hpp>
+#include <escape.hpp>
 
-#include "../include/terminal_multiplexer.hpp"
+#include <terminal_multiplexer.hpp>
 
 TerminalMultiplexer::TerminalMultiplexer() {
     init();
@@ -65,7 +65,7 @@ void TerminalMultiplexer::init() {
         close(pty_bash_slave);
 
         // Set TERM type
-        setenv("TERM", "linux-m", 1);
+        setenv("TERM", "ishell-m", 1);
 
         // Execute the shell
         execl(shell, shell, NULL);
@@ -139,8 +139,8 @@ void TerminalMultiplexer::init() {
     }
 
     // Create temporary unsized screens
-    screens.push_back(Screen(0, 0, NULL, NULL, pty_assistant_master, assistant_pid));
-    screens.push_back(Screen(0, 0, NULL, NULL, pty_bash_master, bash_pid));
+    screens.push_back(Screen(0, 0, pty_assistant_master, assistant_pid));
+    screens.push_back(Screen(0, 0, pty_bash_master, bash_pid));
 
     init_nc();
 }
@@ -160,8 +160,14 @@ void TerminalMultiplexer::init_nc() {
 
 void TerminalMultiplexer::refresh_cursor() {
     if (focus != FOCUS_NULL) {
-        screens[focus].scursyncup();
-        screens[focus].srefresh();
+        if (screens[focus].is_in_manual_scroll()) {
+            curs_set(0);
+        } else {
+            curs_set(1);
+        }
+
+        wcursyncup(screens[focus].get_pad());
+        screens[focus].refresh_screen();
     }
 }
 
@@ -169,14 +175,16 @@ void TerminalMultiplexer::draw_focus() {
     // Change the background color for the entire window
     for (Screen &screen : screens) {
         // Set unfocused colours
-        screen.sbkgd(COLOR_PAIR(2));
+        WINDOW *window = screen.get_pad();
+        wbkgd(window, COLOR_PAIR(2));
     }
 
     // Set focused colour
-    screens[focus].sbkgd(COLOR_PAIR(1));
+    WINDOW *window = screens[focus].get_pad();
+    wbkgd(window, COLOR_PAIR(1));
 
     for (Screen &screen : screens) {
-        screen.srefresh();
+        screen.refresh_screen();
     }
 
     refresh_cursor();
@@ -205,52 +213,70 @@ void TerminalMultiplexer::create_wins_draw() {
     getmaxyx(stdscr, rows, cols);
 
     // Create the windows with proper spacing
-    WINDOW *outer_assistant_win, *outer_bash_win, *assistant_win, *bash_win;
+    WINDOW *outer_assistant_win, *outer_bash_win;
     int assistant_lines = rows / 2 - 3;
     int assistant_cols = cols - 6;
 
     int bash_lines = rows / 2 - 3;
     int bash_cols = cols - 6;
 
+    int assistant_y = 2, assistant_x = 3;
+    int bash_y = rows / 2 + 2, bash_x = 3;
+
     if (zoomed_in) {
         if (focus == 0) {
             // First is the assistant window.
             assistant_lines = rows - 3;
-            outer_assistant_win = newwin(assistant_lines + 2, assistant_cols + 2, 1, 2);
-            outer_bash_win = NULL;
-            assistant_win = subwin(outer_assistant_win, assistant_lines, assistant_cols, 2, 3);
-            bash_win = NULL;
+            bash_y = -1;
+            bash_x = -1;
 
+            outer_assistant_win = newwin(assistant_lines + 2, assistant_cols + 2, assistant_y - 1, assistant_x - 1);
+            outer_bash_win = NULL;
         } else {
             bash_lines = rows - 3;
+            bash_y = 2;
+            assistant_y = -1;
+            assistant_x = -1;
+
             outer_assistant_win = NULL;
-            outer_bash_win = newwin(bash_lines + 2, bash_cols + 2, 1, 2);
-            assistant_win = NULL;
-            bash_win = subwin(outer_bash_win, bash_lines, bash_cols, 2, 3);
+            outer_bash_win = newwin(bash_lines + 2, bash_cols + 2, bash_y - 1, bash_x - 1);
         }
     } else {
-        outer_assistant_win = newwin(assistant_lines + 2, assistant_cols + 2, 1, 2);
-        outer_bash_win = newwin(bash_lines + 2, bash_cols + 2, rows / 2 + 1, 2);
-        assistant_win = subwin(outer_assistant_win, assistant_lines, assistant_cols, 2, 3);
-        bash_win = subwin(outer_bash_win, bash_lines, bash_cols, rows / 2 + 2, 3);
+        outer_assistant_win = newwin(assistant_lines + 2, assistant_cols + 2, assistant_y - 1, assistant_x - 1);
+        outer_bash_win = newwin(bash_lines + 2, bash_cols + 2, bash_y - 1, bash_x - 1);
     }
 
     // Resize old screens
     std::vector<Screen> new_screens;
     
     // Assistant
-    new_screens.push_back(Screen(assistant_lines, assistant_cols, assistant_win, outer_assistant_win, screens[0]));
+    Screen screen = Screen(assistant_lines, assistant_cols, screens[0]);
+    screen.set_screen_coords(assistant_y, assistant_x, assistant_y + assistant_lines - 1, assistant_x + assistant_cols - 1);
+
+    new_screens.push_back(screen);
 
     // Bash
-    new_screens.push_back(Screen(bash_lines, bash_cols, bash_win, outer_bash_win, screens[1]));
+    screen = Screen(bash_lines, bash_cols, screens[1]);
+    screen.set_screen_coords(bash_y, bash_x, bash_y + bash_lines - 1, bash_x + bash_cols - 1);
+
+    new_screens.push_back(screen);
+
+    delete_windows();
 
     screens = new_screens;
 
     // Draw borders around the windows
-    for (Screen &screen : screens) {
-        screen.sbox_outer(0, 0);
-        screen.srefresh_outer();
-        screen.srefresh();
+    if (outer_assistant_win != NULL) {
+        box(outer_assistant_win, 0, 0);
+        wnoutrefresh(outer_assistant_win);
+        windows.push_back(outer_assistant_win);
+    }
+    
+
+    if (outer_bash_win != NULL) {
+        box(outer_bash_win, 0, 0);
+        wrefresh(outer_bash_win);
+        windows.push_back(outer_bash_win);
     }
 
     if (focus == FOCUS_NULL) {
@@ -264,6 +290,12 @@ void TerminalMultiplexer::delete_windows() {
     for (Screen &screen : screens) {
         screen.delete_wins();
     }
+
+    for (WINDOW *window : windows) {
+        delwin(window);
+    }
+
+    windows.clear();
 }
 
 void TerminalMultiplexer::cleanup() {
@@ -291,7 +323,6 @@ void TerminalMultiplexer::send_dims() {
 }
 
 void TerminalMultiplexer::resize() {
-    delete_windows();
     clear();
     refresh();
     create_wins_draw();
@@ -355,6 +386,18 @@ void TerminalMultiplexer::run_terminal() {
         exit(EXIT_FAILURE);
     }
 
+    // Make sigfd non-blocking (a potential spurious wake-up might block the app)
+    int flags = fcntl(sigfd, F_GETFL, 0);
+    if (flags == -1) {
+        perror("fcntl: F_GETFL sigfd");
+        exit(EXIT_FAILURE);
+    }
+
+    if (fcntl(sigfd, F_SETFL, flags | O_NONBLOCK) == -1) {
+        perror("fcntl: F_SETFL sigfd");
+        exit(EXIT_FAILURE);
+    }
+
     event.events = EPOLLIN;
     event.data.fd = sigfd;
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, sigfd, &event) == -1) {
@@ -370,7 +413,7 @@ void TerminalMultiplexer::run_terminal() {
 
         if (n < 0) {
             if (errno == EINTR) {
-                // :(
+                // this happens sometimes
                 continue;
             }
 
@@ -392,6 +435,10 @@ void TerminalMultiplexer::run_terminal() {
                 ssize_t s = read(sigfd, &sigfd_info, sizeof(struct signalfd_siginfo));
 
                 if (s != sizeof(struct signalfd_siginfo)) {
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        // Spurious wake-up, ignore
+                        continue;
+                    }
                     perror("read signalfd");
                     exit(EXIT_FAILURE);
                 }
@@ -424,122 +471,42 @@ void TerminalMultiplexer::run_terminal() {
 }
 
 int TerminalMultiplexer::handle_screen_output(Screen &screen, int fd) {
-    std::vector<TerminalChar> chars;
-    int n = read_and_escape(fd, chars);
+    int bytes_read = 0;
 
-    if (n < 0) {
-        if (errno == EIO) {
-            // PTY set EIO (-1) for closure for some reason...
-            return -1;
-        } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            return 1;
-        }
+    while (1) {
+        std::vector<TerminalChar> chars;
+        int n = read_and_escape(fd, chars);
 
-        perror("read");
-        exit(EXIT_FAILURE);
-    }
-
-    if (n > 0) {        
-        for (TerminalChar &tch : chars) {
-            // CR
-            if (tch.ch == '\r') {
-                screen.cursor_return();
-                continue;
-            }
-
-            if (tch.ch == '\n') {
-                screen.newline();
-                continue;
-            }
-
-            // BEL (ignore)
-            if (tch.ch == KEY_BEL) {
-                continue;
-            }
-
-            // Disable alt charset (ignore)
-            if (tch.ch == KEY_SI) {
-                continue;
-            }
-
-            // BKSP
-            if (tch.ch == KEY_BS) {
-                screen.cursor_back();
-                continue;
-            }
-
-            if (tch.ch > 255) {
-                if (tch.ch == E_KEY_CLEAR) {
-                    screen.clear();
-                } else if (tch.ch == E_KEY_DCH) {
-                    int del_cnt = 1;
-                    if (tch.args.size() == 1) {
-                        del_cnt = tch.args[0];
-                    }
-                    screen.erase(del_cnt);
-                } else if (tch.ch == E_KEY_EL) {
-                    screen.erase_to_eol();
-                } else if (tch.ch == E_KEY_CUP) {
-                    int y = 1;
-                    int x = 1;
-                    if (tch.args.size() == 2) {
-                        y = tch.args[0];
-                        x = tch.args[1];
-                    }
-                    screen.move_cursor(y - 1, x - 1);
-                } else if (tch.ch == E_KEY_VPA) {
-                    int y = 1;
-                    if (tch.args.size() == 1) {
-                        y = tch.args[0];
-                    }
-                    screen.move_cursor(y - 1, screen.get_x());
-                } else if (tch.ch == E_KEY_CUB) {
-                    int x_offs = 1;
-                    if (tch.args.size() == 1) {
-                        x_offs = tch.args[0];
-                    }
-                    screen.move_cursor(screen.get_y(), screen.get_x() - x_offs);
-                } else if (tch.ch == E_KEY_CUF) {
-                    int x_offs = 1;
-                    if (tch.args.size() == 1) {
-                        x_offs = tch.args[0];
-                    }
-                    screen.move_cursor(screen.get_y(), screen.get_x() + x_offs);
-                } else if (tch.ch == E_KEY_CUU) {
-                    int y_offs = 1;
-                    if (tch.args.size() == 1) {
-                        y_offs = tch.args[0];
-                    }
-                    screen.move_cursor(screen.get_y() - y_offs, screen.get_x());
-                } else if (tch.ch == E_KEY_CUD) {
-                    int y_offs = 1;
-                    if (tch.args.size() == 1) {
-                        y_offs = tch.args[0];
-                    }
-                    screen.move_cursor(screen.get_y() + y_offs, screen.get_x());
-                } else if (tch.ch == E_KEY_RI) {
-                    screen.scroll_up();
-                } else if (tch.ch == E_KEY_ICH) {
-                    int num = 1;
-                    if (tch.args.size() == 1) {
-                        num = tch.args[0];
-                    }
-                    screen.insert_next(num);
+        if (n < 0) {
+            if (errno == EIO) {
+                // PTY set EIO (-1) for closure for some reason...
+                return -1;
+            } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // Done reading. Do not return a 0 if spurious
+                if (bytes_read == 0) {
+                    bytes_read = 1;
                 }
-
-                continue;
+                break;
             }
 
-            if (tch.ch > 0 && tch.ch < 256) {
-                screen.write_char(tch.ch);
-            }
+            perror("read");
+            exit(EXIT_FAILURE);
         }
 
+        if (n > 0) {
+            bytes_read += n;
+            for (TerminalChar &tch : chars) {
+                screen.handle_char(tch);
+            }
+        }
     }
 
-    refresh_cursor();
+    if (bytes_read > 0) {
+        screen.refresh_screen();
+        refresh_cursor();
+    }
 
-    return n;
+    return bytes_read;
 }
 
 int TerminalMultiplexer::handle_input() {
@@ -580,8 +547,10 @@ int TerminalMultiplexer::handle_input() {
             if (screens[focus].is_in_manual_scroll()) {
                 if (tch.ch == E_KEY_CUU) {
                     screens[focus].manual_scroll_up();
+                    refresh_cursor();
                 } else if (tch.ch == E_KEY_CUD) {
                     screens[focus].manual_scroll_down();
+                    refresh_cursor();
                 }
             } else {
                 for (char ch : tch.sequence) {
@@ -611,9 +580,11 @@ void TerminalMultiplexer::zoom_out() {
 void TerminalMultiplexer::toggle_manual_scroll() {
     if (focus != FOCUS_NULL) {
         if (screens[focus].is_in_manual_scroll()) {
-            screens[focus].manual_scroll_reset();
+            screens[focus].reset_manual_scroll();
+            refresh_cursor();
         } else {
             screens[focus].enter_manual_scroll();
+            refresh_cursor();
         }
     }
 }

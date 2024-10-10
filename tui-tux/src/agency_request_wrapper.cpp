@@ -5,8 +5,8 @@
 #include <string>
 #include <iostream>
 #include "../nlohmann/json.hpp"
-#include "../include/https_client.hpp"
-#include "../include/agency_request_wrapper.hpp"
+#include <https_client.hpp>
+#include <agency_request_wrapper.hpp>
 
 #define INSTALLED_PACKAGES_BUFSIZ 128
 

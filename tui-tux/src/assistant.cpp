@@ -6,9 +6,9 @@
 #include <algorithm>
 #include <sstream>
 #include <vector>
-#include "../include/agency_manager.hpp"
-#include "../include/bookmark_manager.hpp"
-#include "../include/agency_request_wrapper.hpp"
+#include <agency_manager.hpp>
+#include <bookmark_manager.hpp>
+#include <agency_request_wrapper.hpp>
 
 // <query, result>
 std::vector<std::pair<std::string, std::string>> session_history;
