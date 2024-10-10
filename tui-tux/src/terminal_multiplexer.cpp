@@ -225,7 +225,7 @@ void TerminalMultiplexer::create_wins_draw() {
     getmaxyx(stdscr, rows, cols);
 
     int middle_row = (rows - 1) / 2;
-    int assistant_lines = middle_row - 1;
+    int assistant_lines = middle_row;
     int assistant_cols = cols;
 
     int bash_lines = rows - middle_row - 2;
