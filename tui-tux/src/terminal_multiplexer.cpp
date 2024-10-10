@@ -11,7 +11,7 @@
 
 #include <screen.hpp>
 #include <utils.hpp>
-#include <assistant.hpp>
+#include <agent.hpp>
 #include <escape.hpp>
 
 #include <terminal_multiplexer.hpp>
@@ -81,31 +81,31 @@ void TerminalMultiplexer::init() {
 
     close(pty_bash_slave);
 
-    int pty_assistant_master, pty_assistant_slave;
-    if (openpty(&pty_assistant_master, &pty_assistant_slave, NULL, NULL, NULL) == -1) {
+    int pty_agent_master, pty_agent_slave;
+    if (openpty(&pty_agent_master, &pty_agent_slave, NULL, NULL, NULL) == -1) {
         perror("openpty: agent");
         exit(EXIT_FAILURE);
     }
 
     // Fork again
-    int assistant_pid = fork();
+    int agent_pid = fork();
 
-    if (assistant_pid < 0) {
-        perror("fork: assistant_pty");
+    if (agent_pid < 0) {
+        perror("fork: agent_pty");
         exit(EXIT_FAILURE);
     }
 
-    if (assistant_pid == 0) {
+    if (agent_pid == 0) {
         // Run the agent
         close(pty_bash_master);
-        close(pty_assistant_master);
+        close(pty_agent_master);
 
         // Duplicate pty slave
-        dup2(pty_assistant_slave, STDIN_FILENO);
-        dup2(pty_assistant_slave, STDOUT_FILENO);
-        dup2(pty_assistant_slave, STDERR_FILENO);
+        dup2(pty_agent_slave, STDIN_FILENO);
+        dup2(pty_agent_slave, STDOUT_FILENO);
+        dup2(pty_agent_slave, STDERR_FILENO);
 
-        close(pty_assistant_slave);
+        close(pty_agent_slave);
 
         // Set TERM type
         setenv("TERM", "ishell-m", 1);
@@ -117,7 +117,7 @@ void TerminalMultiplexer::init() {
         exit(EXIT_SUCCESS);
     }
 
-    close(pty_assistant_slave);
+    close(pty_agent_slave);
 
     // Parent process will handle the Terminal Emulator
     // Set the masters as non-blocking
@@ -133,20 +133,20 @@ void TerminalMultiplexer::init() {
         exit(EXIT_FAILURE);
     }
 
-    rv = fcntl(pty_assistant_master, F_GETFL, 0);
+    rv = fcntl(pty_agent_master, F_GETFL, 0);
     if (rv < 0) {
         perror("fcntl: F_GETFL");
         exit(EXIT_FAILURE);
     }
 
     rv |= O_NONBLOCK;
-    if (fcntl(pty_assistant_master, F_SETFL, rv) < 0) {
+    if (fcntl(pty_agent_master, F_SETFL, rv) < 0) {
         perror("fcntl: F_SETFL");
         exit(EXIT_FAILURE);
     }
 
     // Create temporary unsized screens
-    screens.push_back(Screen(0, 0, pty_assistant_master, assistant_pid));
+    screens.push_back(Screen(0, 0, pty_agent_master, agent_pid));
     screens.push_back(Screen(0, 0, pty_bash_master, bash_pid));
 
     init_nc();
@@ -185,18 +185,18 @@ void TerminalMultiplexer::draw_focus() {
     // Change the background color for the entire window
     int cols = getmaxx(middle_divider);
 
-    int assistant_color = WHITE_FOREGROUND;
+    int agent_color = WHITE_FOREGROUND;
     int bash_color = WHITE_FOREGROUND;
 
-    if (focus == FOCUS_ASSISTANT) {
-        assistant_color = MAGENTA_FOREGROUND;
+    if (focus == FOCUS_AGENT) {
+        agent_color = MAGENTA_FOREGROUND;
     } else if (focus == FOCUS_BASH) {
         bash_color = MAGENTA_FOREGROUND;
     }
 
-    wattron(middle_divider, COLOR_PAIR(assistant_color));
+    wattron(middle_divider, COLOR_PAIR(agent_color));
     mvwhline(middle_divider, 0, 0, 0, cols / 2);
-    wattroff(middle_divider, COLOR_PAIR(assistant_color));
+    wattroff(middle_divider, COLOR_PAIR(agent_color));
 
     wattron(middle_divider, COLOR_PAIR(bash_color));
     mvwhline(middle_divider, 0, cols / 2, 0, cols - cols / 2);
@@ -228,13 +228,13 @@ void TerminalMultiplexer::create_wins_draw() {
     getmaxyx(stdscr, rows, cols);
 
     int middle_row = (rows - 1) / 2;
-    int assistant_lines = middle_row;
-    int assistant_cols = cols;
+    int agent_lines = middle_row;
+    int agent_cols = cols;
 
     int bash_lines = rows - middle_row - 2;
     int bash_cols = cols;
 
-    int assistant_y = 0, assistant_x = 0;
+    int agent_y = 0, agent_x = 0;
     int bash_y = middle_row + 1, bash_x = 0;
 
     // Create windows for bottom bar and middle divider
@@ -254,24 +254,24 @@ void TerminalMultiplexer::create_wins_draw() {
     wrefresh(bottom_bar);
 
     if (zoomed_in) {
-        if (focus == FOCUS_ASSISTANT) {
-            assistant_lines = rows - 1;
+        if (focus == FOCUS_AGENT) {
+            agent_lines = rows - 1;
             bash_y = -1;
             bash_x = -1;
         } else if (focus == FOCUS_BASH) {
             bash_lines = rows - 1;
             bash_y = 0;
-            assistant_y = -1;
-            assistant_x = -1;
+            agent_y = -1;
+            agent_x = -1;
         }
     }
 
     // Resize old screens
     std::vector<Screen> new_screens;
     
-    // Assistant
-    Screen screen = Screen(assistant_lines, assistant_cols, screens[0]);
-    screen.set_screen_coords(assistant_y, assistant_x, assistant_y + assistant_lines - 1, assistant_x + assistant_cols - 1);
+    // Agent
+    Screen screen = Screen(agent_lines, agent_cols, screens[0]);
+    screen.set_screen_coords(agent_y, agent_x, agent_y + agent_lines - 1, agent_x + agent_cols - 1);
 
     new_screens.push_back(screen);
 
