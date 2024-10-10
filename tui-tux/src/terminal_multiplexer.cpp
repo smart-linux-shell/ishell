@@ -83,7 +83,7 @@ void TerminalMultiplexer::init() {
 
     int pty_assistant_master, pty_assistant_slave;
     if (openpty(&pty_assistant_master, &pty_assistant_slave, NULL, NULL, NULL) == -1) {
-        perror("openpty: assistant");
+        perror("openpty: agent");
         exit(EXIT_FAILURE);
     }
 
@@ -96,7 +96,7 @@ void TerminalMultiplexer::init() {
     }
 
     if (assistant_pid == 0) {
-        // Run the assistant
+        // Run the agent
         close(pty_bash_master);
         close(pty_assistant_master);
 
@@ -107,8 +107,11 @@ void TerminalMultiplexer::init() {
 
         close(pty_assistant_slave);
 
-        // Run assistant
-        assistant();
+        // Set TERM type
+        setenv("TERM", "ishell-m", 1);
+
+        // Run agent
+        agent();
 
         // Exit
         exit(EXIT_SUCCESS);
