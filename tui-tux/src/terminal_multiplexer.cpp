@@ -16,6 +16,10 @@
 
 #include <terminal_multiplexer.hpp>
 
+#define MAGENTA_FOREGROUND 1
+#define WHITE_FOREGROUND 2
+#define WHITE_ON_MAGENTA 3
+
 TerminalMultiplexer::TerminalMultiplexer() {
     init();
 }
@@ -147,12 +151,15 @@ void TerminalMultiplexer::init() {
 
 void TerminalMultiplexer::init_nc() {
     initscr();
+    start_color();
+    use_default_colors();
     raw();
     nodelay(stdscr, TRUE);
 
     start_color();
-    init_pair(1, COLOR_BLACK, COLOR_WHITE); // Focused window
-    init_pair(2, COLOR_WHITE, COLOR_BLACK); // Unfocused window
+    init_pair(MAGENTA_FOREGROUND, COLOR_MAGENTA, -1); // Magenta foreground
+    init_pair(WHITE_FOREGROUND, COLOR_WHITE, -1); // White foreground
+    init_pair(WHITE_ON_MAGENTA, COLOR_WHITE, COLOR_MAGENTA); // White foreground, Magenta background
     noecho();
 
     create_wins_draw();
@@ -173,20 +180,26 @@ void TerminalMultiplexer::refresh_cursor() {
 
 void TerminalMultiplexer::draw_focus() {
     // Change the background color for the entire window
-    for (Screen &screen : screens) {
-        // Set unfocused colours
-        WINDOW *window = screen.get_pad();
-        wbkgd(window, COLOR_PAIR(2));
+    int cols = getmaxx(middle_divider);
+
+    int assistant_color = WHITE_FOREGROUND;
+    int bash_color = WHITE_FOREGROUND;
+
+    if (focus == FOCUS_ASSISTANT) {
+        assistant_color = MAGENTA_FOREGROUND;
+    } else if (focus == FOCUS_BASH) {
+        bash_color = MAGENTA_FOREGROUND;
     }
 
-    // Set focused colour
-    WINDOW *window = screens[focus].get_pad();
-    wbkgd(window, COLOR_PAIR(1));
+    wattron(middle_divider, COLOR_PAIR(assistant_color));
+    mvwhline(middle_divider, 0, 0, 0, cols / 2);
+    wattroff(middle_divider, COLOR_PAIR(assistant_color));
 
-    for (Screen &screen : screens) {
-        screen.refresh_screen();
-    }
+    wattron(middle_divider, COLOR_PAIR(bash_color));
+    mvwhline(middle_divider, 0, cols / 2, 0, cols - cols / 2);
+    wattroff(middle_divider, COLOR_PAIR(bash_color));
 
+    wrefresh(middle_divider);
     refresh_cursor();
 }
 
@@ -209,41 +222,45 @@ void TerminalMultiplexer::switch_focus() {
 
 void TerminalMultiplexer::create_wins_draw() {
     int rows, cols;
-
     getmaxyx(stdscr, rows, cols);
 
-    // Create the windows with proper spacing
-    WINDOW *outer_assistant_win, *outer_bash_win;
-    int assistant_lines = rows / 2 - 3;
-    int assistant_cols = cols - 6;
+    int middle_row = (rows - 1) / 2;
+    int assistant_lines = middle_row;
+    int assistant_cols = cols;
 
-    int bash_lines = rows / 2 - 3;
-    int bash_cols = cols - 6;
+    int bash_lines = rows - middle_row - 2;
+    int bash_cols = cols;
 
-    int assistant_y = 2, assistant_x = 3;
-    int bash_y = rows / 2 + 2, bash_x = 3;
+    int assistant_y = 0, assistant_x = 0;
+    int bash_y = middle_row + 1, bash_x = 0;
+
+    // Create windows for bottom bar and middle divider
+    if (bottom_bar != NULL) {
+        delwin(bottom_bar);
+    }
+
+    if (middle_divider != NULL) {
+        delwin(middle_divider);
+    }
+
+    bottom_bar = newwin(1, cols, rows - 1, 0);
+    middle_divider = newwin(1, cols, middle_row, 0);
+
+    wbkgd(bottom_bar, COLOR_PAIR(WHITE_ON_MAGENTA));
+    wprintw(bottom_bar, "ishell");
+    wrefresh(bottom_bar);
 
     if (zoomed_in) {
-        if (focus == 0) {
-            // First is the assistant window.
-            assistant_lines = rows - 3;
+        if (focus == FOCUS_ASSISTANT) {
+            assistant_lines = rows - 1;
             bash_y = -1;
             bash_x = -1;
-
-            outer_assistant_win = newwin(assistant_lines + 2, assistant_cols + 2, assistant_y - 1, assistant_x - 1);
-            outer_bash_win = NULL;
-        } else {
-            bash_lines = rows - 3;
-            bash_y = 2;
+        } else if (focus == FOCUS_BASH) {
+            bash_lines = rows - 1;
+            bash_y = 0;
             assistant_y = -1;
             assistant_x = -1;
-
-            outer_assistant_win = NULL;
-            outer_bash_win = newwin(bash_lines + 2, bash_cols + 2, bash_y - 1, bash_x - 1);
         }
-    } else {
-        outer_assistant_win = newwin(assistant_lines + 2, assistant_cols + 2, assistant_y - 1, assistant_x - 1);
-        outer_bash_win = newwin(bash_lines + 2, bash_cols + 2, bash_y - 1, bash_x - 1);
     }
 
     // Resize old screens
@@ -264,20 +281,6 @@ void TerminalMultiplexer::create_wins_draw() {
     delete_windows();
 
     screens = new_screens;
-
-    // Draw borders around the windows
-    if (outer_assistant_win != NULL) {
-        box(outer_assistant_win, 0, 0);
-        wnoutrefresh(outer_assistant_win);
-        windows.push_back(outer_assistant_win);
-    }
-    
-
-    if (outer_bash_win != NULL) {
-        box(outer_bash_win, 0, 0);
-        wrefresh(outer_bash_win);
-        windows.push_back(outer_bash_win);
-    }
 
     if (focus == FOCUS_NULL) {
         switch_focus();
