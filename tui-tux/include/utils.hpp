@@ -16,5 +16,10 @@
 #define LINE_INFO_UNTOUCHED 0
 #define LINE_INFO_UNWRAPPED 1
 #define LINE_INFO_WRAPPED 2
+#include <string>
+#include <vector>
+
+std::vector<std::string> split(std::string &str, char delim, bool ignore_empty);
+std::string join(std::vector<std::string> &words, char delim);
 
 #endif

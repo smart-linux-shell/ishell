@@ -2,7 +2,7 @@ TARGET := ishell
 TEST_TARGET := test_ishell
 
 # Configurable
-NO_MAIN_SOURCES := screen.cpp escape.cpp agency_manager.cpp bookmark_manager.cpp agent.cpp terminal_multiplexer.cpp agency_request_wrapper.cpp https_client.cpp
+NO_MAIN_SOURCES := screen.cpp escape.cpp agency_manager.cpp command_manager.cpp bookmark_manager.cpp agent.cpp terminal_multiplexer.cpp agency_request_wrapper.cpp https_client.cpp utils.cpp
 SOURCES := $(NO_MAIN_SOURCES) main.cpp
 
 TEST_SOURCES := test_bookmark_manager.cpp test_agency_request_wrapper.cpp test_https_client.cpp test_escape.cpp test_agency_manager.cpp test_terminal_multiplexer.cpp

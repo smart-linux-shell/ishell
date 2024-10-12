@@ -18,7 +18,7 @@ void AgencyManager::get_agency_url() {
     }
 }
 
-std::string AgencyManager::execute_query(const std::string &query, std::vector<std::pair<std::string, std::string>> &session_history) {
+std::string AgencyManager::execute_query(const std::string &query) {
     if (!agency_url_set) {
         std::cerr << "ISHELL_AGENCY_URL not set\n";
         return "";

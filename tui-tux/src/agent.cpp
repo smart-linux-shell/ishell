@@ -12,20 +12,36 @@
 
 #include <stdlib.h>
 
+#include "command_manager.hpp"
+
 #define AGENT_SYSTEM 0
 #define AGENT_ASSISTANT 1
 #define N_AGENTS 2
 
-// <query, result>
-std::vector<std::pair<std::string, std::string>> session_history;
-
 // Global variables are unfortunately needed because of readline limitations
+std::vector<std::vector<std::string>> history_storage;      // stores histories for all tabs
+
 AgencyRequestWrapper request_wrapper;
 AgencyManager manager(&request_wrapper);
 BookmarkManager bookmark_manager(&manager);
+CommandManager command_manager(&bookmark_manager);
 
 bool running = true;
 int agent_type = AGENT_ASSISTANT;
+
+void save_history(std::vector<std::string>& history_storage) {
+    history_storage.clear();
+    for (HIST_ENTRY **entry = history_list(); entry && *entry; ++entry) {
+        history_storage.push_back((*entry)->line);
+    }
+}
+
+void load_history(const std::vector<std::string>& history_storage) {
+    clear_history();
+    for (const std::string& line : history_storage) {
+        add_history(line.c_str());
+    }
+}
 
 void line_handler(char *line) {
     if (!line) {
@@ -34,41 +50,23 @@ void line_handler(char *line) {
     }
 
     std::string input_str(line);
+    add_history(line);
 
     if (agent_type == AGENT_ASSISTANT) {
-        if (bookmark_manager.is_bookmark_command(input_str)) {
-            bookmark_manager.handle_bookmark_command(input_str, session_history);
-        } else {
-            std::istringstream iss(input_str);
-            std::string alias, option;
-            iss >> alias >> option;
-            if (bookmark_manager.is_bookmark_flag(option) && bookmark_manager.is_bookmark(alias)) {
-                // Use bookmarked
-                std::pair<std::string, std::string> bookmark = bookmark_manager.get_bookmark(alias);
-                session_history.push_back(bookmark);
-                std::cout << bookmark.second << "\n";
-            } else if (bookmark_manager.is_remove_flag(option)) {
-                // Remove bookmark
-                bookmark_manager.remove_bookmark(alias);
-            } else if (input_str == "clear") {
-                add_history(input);
-                session_history.clear();
-                std::cout << "Cleared session history.\n\n";
-            } else {
-                // New query to agent
-                add_history(line);
-                std::string result = manager.execute_query(input_str, session_history);
-                std::cout << result << "\n";
-            }
-        }
+        // New query to agent
+        std::string result = manager.execute_query(input_str);
+        std::cout << result << "\n";
     } else if (agent_type == AGENT_SYSTEM) {
-        std::cout << "Unimplemented yet!\n";
+        command_manager.run_command(input_str);
     }
 
     free(line);
 }
 
 void agent() {
+    // Enable history storage
+    history_storage = std::vector(2, std::vector<std::string>());
+
     // Disable TAB-completion. This was impossible to find
     rl_inhibit_completion = 1;
 
@@ -101,7 +99,9 @@ void agent() {
                 rl_delete_text(pos - 1, pos);
                 rl_point = rl_end;
                 rl_redisplay();
+                save_history(history_storage[agent_type]);
                 agent_type = (agent_type + 1) % N_AGENTS;
+                load_history(history_storage[agent_type]);
                 break;
             }
         }

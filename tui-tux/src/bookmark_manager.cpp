@@ -12,9 +12,6 @@
 
 using json = nlohmann::json;
 
-
-#define HELP_FILENAME "manuals/bookmark.txt"
-
 BookmarkManager::BookmarkManager(AgencyManager* agencyManager) {
   agency_manager = agencyManager;
 }
@@ -71,78 +68,36 @@ void BookmarkManager::save_bookmarks(const std::string &filename) {
     file << bookmark_json.dump(4);
 }
 
-bool BookmarkManager::is_bookmark_command(const std::string &input_str) const {
-    return input_str.find("bookmark") == 0;
-}
-
-bool BookmarkManager::is_bookmark_flag(const std::string &option) const {
-    return (option == "-b" || option == "--bookmark");
-}
-
-bool BookmarkManager::is_remove_flag(const std::string &option) const {
-    return (option == "-r" || option == "--remove");
-}
-
 bool BookmarkManager::is_bookmark(const std::string &alias) const {
     return bookmarks.find(alias) != bookmarks.end();
 }
 
 std::pair<std::string, std::string> BookmarkManager::get_bookmark(const std::string &alias) const {
-    std::unordered_map<std::string, std::pair<std::string, std::string>>::const_iterator it = bookmarks.find(alias);
+    auto it = bookmarks.find(alias);
     if (it != bookmarks.end()) {
         return it->second; // Return the value if found
     }
     return {"", ""}; // Return an empty pair if not found
 }
 
-bool BookmarkManager::is_list_flag(const std::string &input) const {
-    return (input == "bookmark -l" || input == "bookmark --list");
-}
-
-bool BookmarkManager::is_help_flag(const std::string &input) const {
-    return (input == "bookmark -h" || input == "bookmark --help");
-}
-
-std::string BookmarkManager::get_query_from_history(int index) {
-    if (index > 0 && index <= history_length) {
-        HIST_ENTRY *he = history_get(history_length - index + 1);
-        if (he) {
-            return std::string(he->line);
-        }
-    }
-    return "";
-}
-
-std::string BookmarkManager::find_result_in_session_history(const std::string &query, std::vector<std::pair<std::string, std::string>> &session_history) {
-    std::vector<std::pair<std::string, std::string>>::iterator it = std::find_if(session_history.begin(), session_history.end(),
-                           [&query](const std::pair<std::string, std::string> &entry) {
-                               return entry.first == query;
-                           });
-    if (it != session_history.end()) {
-        return it->second;
-    }
-    return "";
-}
-
-void BookmarkManager::bookmark(int index, const std::string &alias, std::vector<std::pair<std::string, std::string>> &session_history) {
+void BookmarkManager::bookmark(int index, const std::string &alias) {
    // bookmark already exists
     if (bookmarks.find(alias) != bookmarks.end()) {
         std::cerr << "Error: Bookmark '" << alias << "' already exists.\n";
         return;
     }
-    // find query
-    std::string query = get_query_from_history(index);
-    if (query.empty()) {
+
+    // find <query, result> pair
+    int len = agency_manager->session_history.size();
+    if (index <= 0 || index > len) {
         std::cerr << "Error: Invalid history index.\n";
         return;
     }
-    // find result
-    std::string result = find_result_in_session_history(query, session_history);
-    if (result.empty()) {
-       result = agency_manager->execute_query(query, session_history);
-    }
+
+    auto pair = agency_manager->session_history[len - index];
+
     // bookmark
-    bookmarks[alias] = {query, result};
+    bookmarks[alias] = pair;
     std::cout << "Saved the query under the bookmark '" << alias  << "'" << "\n";
 }
 
@@ -166,56 +121,5 @@ void BookmarkManager::list_bookmarks() const {
         std::cout << std::left << std::setw(alias_width) << it->first
                   << std::setw(query_width) << it->second.first
                   << "\n";
-    }
-}
-
-void BookmarkManager::help(std::string manual_filename) {
-    std::ifstream file(manual_filename);
-
-    if (!file.is_open()) {
-        std::cerr << "Error: Could not find the documentation.\n";
-        return;
-    }
-    std::string line;
-    while (std::getline(file, line)) {
-        std::cout << line << "\n";
-    }
-    file.close();
-}
-
-bool BookmarkManager::try_parse_bookmark_command(const std::string &input_str, std::string &cmd, int &index, std::string &alias) {
-    std::istringstream iss(input_str);
-    // try to parse "bookmark <index> <alias>"
-    if (iss >> cmd >> index >> alias && cmd == "bookmark") {
-        return true;
-    }
-    // if parsing fails, try to parse "bookmark <alias>"
-    iss.clear();
-    iss.str(input_str);
-    if (iss >> cmd >> alias && cmd == "bookmark") {
-        index = 1; // default index if not provided
-        return true;
-    }
-    return false;
-}
-
-void BookmarkManager::handle_bookmark_command(const std::string &input_str, std::vector<std::pair<std::string, std::string>> &session_history) {
-    if (is_list_flag(input_str)) {
-        list_bookmarks();
-        return;
-    }
-    else if (is_help_flag(input_str)) {
-        help(HELP_FILENAME);
-        return;
-    }
-
-    std::string cmd;
-    int index;
-    std::string alias;
-    if (try_parse_bookmark_command(input_str, cmd, index, alias)) {
-        bookmark(index, alias, session_history);
-    } else {
-        std::cerr << "Error: Invalid bookmark command format.\n";
-        help(HELP_FILENAME);
     }
 }
