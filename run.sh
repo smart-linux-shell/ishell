@@ -9,6 +9,7 @@ DEPENDENCIES=(
 )
 
 JSON_DIR="tui-tux/nlohmann"
+RUN_TESTS=false
 
 is_package_installed() {
     dpkg -s "$1" &> /dev/null
@@ -27,19 +28,21 @@ if ! [ -f "$JSON_DIR/json.hpp" ]; then
     wget https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp -O "$JSON_DIR/json.hpp"
 fi
 
-echo "Checking for ishell-m..."
-infocmp ishell-m 1>/dev/null 2>/dev/null
-if [ $? != 0 ]; then
-    echo "Installing ishell-m..."
-    tic ishell-m.info || exit
-fi
-
 if [ -d "$PROJECT_DIR" ]; then
     cd "$PROJECT_DIR" || exit
 else
     echo "Error: Directory '$PROJECT_DIR' does not exist."
     exit 1
 fi
+
+for arg in "$@"; do
+    case $arg in
+        -t|--test)
+        RUN_TESTS=true
+        shift
+        ;;
+    esac
+done
 
 echo "Checking dependencies..."
 for pkg in "${DEPENDENCIES[@]}"; do
@@ -64,13 +67,23 @@ else
     exit 1
 fi
 
-if [ -x "./ishell" ]; then
-    echo "Executable 'ishell' found."
+# Check if the user wants to run tests
+if [ "$RUN_TESTS" = true ]; then
+    echo "Running tests..."
+    if make run_test; then
+        echo "Tests ran successfully."
+    else
+        echo "Error: Tests failed."
+        exit 1
+    fi
 else
-    echo "Error: Executable 'ishell' not found. Build might have failed."
-    exit 1
-fi
+    if [ -x "./ishell" ]; then
+        echo "Executable 'ishell' found."
+    else
+        echo "Error: Executable 'ishell' not found. Build might have failed."
+        exit 1
+    fi
 
-# Run the main executable
-echo "Running the program..."
-./ishell
+    echo "Running the program..."
+    ./ishell
+fi
