@@ -1,12 +1,12 @@
 #include <ncurses.h>
 #include <sys/epoll.h>
 #include <sys/signalfd.h>
-#include <signal.h>
+#include <csignal>
 #include <pty.h>
-#include <stdlib.h>
+#include <cstdlib>
 #include <fcntl.h>
-#include <string.h>
-#include <errno.h>
+#include <cstring>
+#include <cerrno>
 #include <string>
 
 #include <screen.hpp>
@@ -36,7 +36,7 @@ void TerminalMultiplexer::init() {
     // Create a new PTY
     int pty_bash_master, pty_bash_slave;
 
-    if (openpty(&pty_bash_master, &pty_bash_slave, NULL, NULL, NULL) == -1) {
+    if (openpty(&pty_bash_master, &pty_bash_slave, nullptr, nullptr, nullptr) == -1) {
         perror("openpty: bash");
         exit(EXIT_FAILURE);
     }
@@ -82,7 +82,7 @@ void TerminalMultiplexer::init() {
     close(pty_bash_slave);
 
     int pty_agent_master, pty_agent_slave;
-    if (openpty(&pty_agent_master, &pty_agent_slave, NULL, NULL, NULL) == -1) {
+    if (openpty(&pty_agent_master, &pty_agent_slave, nullptr, nullptr, nullptr) == -1) {
         perror("openpty: agent");
         exit(EXIT_FAILURE);
     }
@@ -146,8 +146,8 @@ void TerminalMultiplexer::init() {
     }
 
     // Create temporary unsized screens
-    screens.push_back(Screen(0, 0, pty_agent_master, agent_pid));
-    screens.push_back(Screen(0, 0, pty_bash_master, bash_pid));
+    screens.emplace_back(0, 0, pty_agent_master, agent_pid);
+    screens.emplace_back(0, 0, pty_bash_master, bash_pid);
 
     init_nc();
 }
@@ -168,7 +168,7 @@ void TerminalMultiplexer::init_nc() {
     create_wins_draw();
 }
 
-void TerminalMultiplexer::refresh_cursor() {
+void TerminalMultiplexer::refresh_cursor() const {
     if (focus != FOCUS_NULL) {
         if (screens[focus].is_in_manual_scroll()) {
             curs_set(0);
@@ -181,9 +181,9 @@ void TerminalMultiplexer::refresh_cursor() {
     }
 }
 
-void TerminalMultiplexer::draw_focus() {
+void TerminalMultiplexer::draw_focus() const {
     // Change the background color for the entire window
-    int cols = getmaxx(middle_divider);
+    const int cols = getmaxx(middle_divider);
 
     int agent_color = WHITE_FOREGROUND;
     int bash_color = WHITE_FOREGROUND;
@@ -217,7 +217,7 @@ void TerminalMultiplexer::switch_focus() {
     if (focus == FOCUS_NULL) {
         focus = 0;
     } else {
-        focus = (focus + 1) % screens.size();
+        focus = (focus + 1) % static_cast<int>(screens.size());
     }
 
     draw_focus();
@@ -227,22 +227,22 @@ void TerminalMultiplexer::create_wins_draw() {
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
 
-    int middle_row = (rows - 1) / 2;
+    const int middle_row = (rows - 1) / 2;
     int agent_lines = middle_row;
-    int agent_cols = cols;
+    const int agent_cols = cols;
 
     int bash_lines = rows - middle_row - 2;
-    int bash_cols = cols;
+    const int bash_cols = cols;
 
     int agent_y = 0, agent_x = 0;
     int bash_y = middle_row + 1, bash_x = 0;
 
     // Create windows for bottom bar and middle divider
-    if (bottom_bar != NULL) {
+    if (bottom_bar != nullptr) {
         delwin(bottom_bar);
     }
 
-    if (middle_divider != NULL) {
+    if (middle_divider != nullptr) {
         delwin(middle_divider);
     }
 
@@ -311,7 +311,7 @@ void TerminalMultiplexer::cleanup() {
 
 void TerminalMultiplexer::send_dims() {
     for (Screen &screen : screens) {
-        winsize w;
+        winsize w{};
         memset(&w, 0, sizeof(w));
         w.ws_row = screen.get_n_lines();
         w.ws_col = screen.get_n_cols();
@@ -339,14 +339,14 @@ void TerminalMultiplexer::run_terminal() {
     send_dims();
 
     // Create an epoll instance
-    int epoll_fd = epoll_create1(0);
+    const int epoll_fd = epoll_create1(0);
     if (epoll_fd == -1) {
         perror("epoll_create1");
         exit(EXIT_FAILURE);
     }
 
     // Add stdin to the epoll instance
-    struct epoll_event event;
+    epoll_event event{};
     event.events = EPOLLIN;
     event.data.fd = STDIN_FILENO;
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, STDIN_FILENO, &event) == -1) {
@@ -355,21 +355,21 @@ void TerminalMultiplexer::run_terminal() {
     }
 
     // Add ptys to epoll instance
-    for (size_t i = 0; i < screens.size(); i++) {
-        struct epoll_event event;
-        event.events = EPOLLIN;
-        event.data.fd = screens[i].get_pty_master();
-        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, event.data.fd, &event) == -1) {
+    for (const auto & screen : screens) {
+        epoll_event event1{};
+        event1.events = EPOLLIN;
+        event1.data.fd = screen.get_pty_master();
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, event1.data.fd, &event1) == -1) {
             perror("epoll_ctl: pty");
             exit(EXIT_FAILURE);
         }
     }
 
-    struct sigaction sa_old;
+    struct sigaction sa_old{};
     sigset_t mask;
 
     // Get the existing signal handler for SIGWINCH
-    if (sigaction(SIGWINCH, NULL, &sa_old) == -1) {
+    if (sigaction(SIGWINCH, nullptr, &sa_old) == -1) {
         perror("sigaction");
         exit(EXIT_FAILURE);
     }
@@ -377,7 +377,7 @@ void TerminalMultiplexer::run_terminal() {
     // Block the SIGWINCH signal
     sigemptyset(&mask);
     sigaddset(&mask, SIGWINCH);
-    if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1) {
+    if (sigprocmask(SIG_BLOCK, &mask, nullptr) == -1) {
         perror("sigprocmask");
         exit(EXIT_FAILURE);
     }
@@ -386,14 +386,14 @@ void TerminalMultiplexer::run_terminal() {
     sigemptyset(&mask);
     sigaddset(&mask, SIGWINCH);
 
-    int sigfd = signalfd(-1, &mask, 0);
+    const int sigfd = signalfd(-1, &mask, 0);
     if (sigfd < 0) {
         perror("signalfd");
         exit(EXIT_FAILURE);
     }
 
     // Make sigfd non-blocking (a potential spurious wake-up might block the app)
-    int flags = fcntl(sigfd, F_GETFL, 0);
+    const int flags = fcntl(sigfd, F_GETFL, 0);
     if (flags == -1) {
         perror("fcntl: F_GETFL sigfd");
         exit(EXIT_FAILURE);
@@ -411,11 +411,11 @@ void TerminalMultiplexer::run_terminal() {
         exit(EXIT_FAILURE);
     }
 
-    struct epoll_event events[MAX_EVENTS];
     bool epolling = true;
 
     while (epolling) {
-        int n = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
+        epoll_event events[MAX_EVENTS];
+        const int n = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
 
         if (n < 0) {
             if (errno == EINTR) {
@@ -437,10 +437,9 @@ void TerminalMultiplexer::run_terminal() {
                 }    
             } else if (events[i].data.fd == sigfd) {
                 // Read the signal
-                struct signalfd_siginfo sigfd_info;
-                ssize_t s = read(sigfd, &sigfd_info, sizeof(struct signalfd_siginfo));
+                signalfd_siginfo sigfd_info{};
 
-                if (s != sizeof(struct signalfd_siginfo)) {
+                if (const ssize_t s = read(sigfd, &sigfd_info, sizeof(signalfd_siginfo)); s != sizeof(signalfd_siginfo)) {
                     if (errno == EAGAIN || errno == EWOULDBLOCK) {
                         // Spurious wake-up, ignore
                         continue;
@@ -460,8 +459,7 @@ void TerminalMultiplexer::run_terminal() {
                 // A PTY
                 for (Screen &screen : screens) {
                     if (screen.get_pty_master() == events[i].data.fd) {
-                        int n_pty = handle_screen_output(screen, events[i].data.fd);
-                        if (n_pty <= 0) {
+                        if (const int n_pty = handle_screen_output(screen, events[i].data.fd); n_pty <= 0) {
                             epolling = false;
                             break;
                         }
@@ -476,18 +474,20 @@ void TerminalMultiplexer::run_terminal() {
     close(epoll_fd);
 }
 
-int TerminalMultiplexer::handle_screen_output(Screen &screen, int fd) {
+int TerminalMultiplexer::handle_screen_output(Screen &screen, const int fd) const {
     int bytes_read = 0;
 
-    while (1) {
+    while (true) {
         std::vector<TerminalChar> chars;
-        int n = read_and_escape(fd, chars);
+        const int n = read_and_escape(fd, chars);
 
         if (n < 0) {
             if (errno == EIO) {
                 // PTY set EIO (-1) for closure for some reason...
                 return -1;
-            } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            }
+
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 // Done reading. Do not return a 0 if spurious
                 if (bytes_read == 0) {
                     bytes_read = 1;
@@ -525,42 +525,43 @@ int TerminalMultiplexer::handle_input() {
     */
 
     std::vector<TerminalChar> chars;
-    int n = read_and_escape(STDIN_FILENO, chars);
+    const int n = read_and_escape(STDIN_FILENO, chars);
 
     if (n < 0) {
         perror("read");
         exit(EXIT_FAILURE);
     }
 
-    for (TerminalChar &tch : chars) {        
-        if (tch.ch == 0x02) {
+    for (auto const &tch : chars) {
+        int const ch = toupper(tch.ch);
+        if (ch == 0x02) {
             // Pressed ^B
             waiting_for_command = true;
         } else if (waiting_for_command) {
             waiting_for_command = false;
-            if (tch.ch == '\t') {
+            if (ch == '\t') {
                 switch_focus();
-            } else if (tch.ch == 'Z' || tch.ch == 'z') {
+            } else if (ch == 'Z') {
                 if (!zoomed_in) {
                     zoom_in();
                 } else {
                     zoom_out();
                 }
-            } else if (tch.ch == '[') {
+            } else if (ch == '[') {
                 toggle_manual_scroll();
             }
         } else if (focus != FOCUS_NULL) {
             if (screens[focus].is_in_manual_scroll()) {
-                if (tch.ch == E_KEY_CUU) {
+                if (ch == E_KEY_CUU) {
                     screens[focus].manual_scroll_up();
                     refresh_cursor();
-                } else if (tch.ch == E_KEY_CUD) {
+                } else if (ch == E_KEY_CUD) {
                     screens[focus].manual_scroll_down();
                     refresh_cursor();
                 }
             } else {
-                for (char ch : tch.sequence) {
-                    handle_pty_input(screens[focus].get_pty_master(), ch);
+                for (const char ch1 : tch.sequence) {
+                    handle_pty_input(screens[focus].get_pty_master(), ch1);
                 }
             }
         }
@@ -569,7 +570,7 @@ int TerminalMultiplexer::handle_input() {
     return n;
 }
 
-void TerminalMultiplexer::handle_pty_input(int fd, char ch) {
+void TerminalMultiplexer::handle_pty_input(const int fd, const char ch) {
     write(fd, &ch, 1);
 }
 

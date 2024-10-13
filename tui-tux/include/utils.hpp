@@ -1,7 +1,7 @@
 #ifndef ISHELL_UTILS
 #define ISHELL_UTILS
 
-#define FOCUS_NULL -1
+#define FOCUS_NULL (-1)
 #define FOCUS_AGENT 0
 #define FOCUS_BASH 1
 

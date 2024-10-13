@@ -7,7 +7,7 @@
 
 class AgencyManager {
 public:
-    AgencyManager(AgencyRequestWrapper* request_wrapper);
+    explicit AgencyManager(AgencyRequestWrapper* request_wrapper);
     virtual ~AgencyManager();
 
     void get_agency_url();
@@ -16,7 +16,7 @@ public:
     bool agency_url_set;
     std::string agency_url;
     std::string assistant_url;
-    const char* agency_url_env;
+    const char* agency_url_env{};
     AgencyRequestWrapper* request_wrapper;
 
     // <query, result>

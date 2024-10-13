@@ -6,7 +6,7 @@
 #include <agency_manager.hpp>
 #include <agency_request_wrapper.hpp>
 
-class MockAgencyRequestWrapper : public AgencyRequestWrapper {
+class MockAgencyRequestWrapper final : public AgencyRequestWrapper {
 public:
     MOCK_METHOD(std::string, ask_agent, (const std::string& url, const std::string& query, (std::vector<std::pair<std::string, std::string>> &session_history)), (override));
 };
@@ -18,7 +18,8 @@ protected:
     std::stringstream error_stream;
     std::streambuf *original_cerr;
 
-    AgencyManagerTest() : agency_manager(&mock_request_wrapper) {}
+    AgencyManagerTest() : agency_manager(&mock_request_wrapper), original_cerr(nullptr) {
+    }
 
     void SetUp() override {
         original_cerr = std::cout.rdbuf();
@@ -33,8 +34,6 @@ protected:
         std::cerr.rdbuf(original_cerr);
         // reset environment variable after each test
         unsetenv("ISHELL_AGENCY_URL");
-
-
     }
 };
 
@@ -63,7 +62,7 @@ TEST_F(AgencyManagerTest, GetAgencyUrl_NoUrlSet) {
 // Test case: Returns error message when ISHELL_AGENCY_URL is not set.
 TEST_F(AgencyManagerTest, ExecuteQuery_AgencyUrlNotSet) {
     // act
-    std::string result = agency_manager.execute_query("test query");
+    const std::string result = agency_manager.execute_query("test query");
     // assert
     EXPECT_EQ(result, "");
     EXPECT_EQ(agency_manager.session_history.size(), 0);  // No history added
@@ -77,7 +76,7 @@ TEST_F(AgencyManagerTest, ExecuteQuery_SuccessfullyCallsAgent) {
     EXPECT_CALL(mock_request_wrapper, ask_agent("http://localhost:5000/assistant", "test query", agency_manager.session_history))
         .WillOnce(::testing::Return("agent response"));
     // act
-    std::string result = agency_manager.execute_query("test query");
+    const std::string result = agency_manager.execute_query("test query");
     // assert
     EXPECT_EQ(result, "agent response");
 }
@@ -105,7 +104,7 @@ TEST_F(AgencyManagerTest, ExecuteQuery_AskAgentFails) {
     EXPECT_CALL(mock_request_wrapper, ask_agent("http://localhost:5000/assistant", "test query", agency_manager.session_history))
         .WillOnce(::testing::Return(""));
     // act
-    std::string result = agency_manager.execute_query("test query");
+    const std::string result = agency_manager.execute_query("test query");
     // assert
     EXPECT_EQ(result, "");
     EXPECT_EQ(agency_manager.session_history.size(), 1);  // history is still recorded

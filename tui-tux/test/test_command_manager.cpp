@@ -8,18 +8,18 @@
 
 using namespace testing;
 
-class MockBookmarkManager : public BookmarkManager {
+class MockBookmarkManager final : public BookmarkManager {
 public:
-    MockBookmarkManager(AgencyManager* agency_mgr) : BookmarkManager(agency_mgr) {}
+    explicit MockBookmarkManager(AgencyManager* agency_mgr) : BookmarkManager(agency_mgr) {}
 
     MOCK_METHOD(void, bookmark, (int index, const std::string &alias), (override));
     MOCK_METHOD(void, list_bookmarks, (), (const, override));
     MOCK_METHOD(void, remove_bookmark, (const std::string &alias), (override));
 };
 
-class MockCommandManager : public CommandManager {
+class MockCommandManager final : public CommandManager {
 public:
-    MockCommandManager(BookmarkManager *bookmark_manager) : CommandManager(bookmark_manager) {}
+    explicit MockCommandManager(BookmarkManager *bookmark_manager) : CommandManager(bookmark_manager) {}
 
     MOCK_METHOD(int, read_from_file, (std::string &filepath, std::string &output), (override));
 };
@@ -37,8 +37,8 @@ public:
     std::stringstream output_stream;
     std::stringstream error_stream;
 
-    std::streambuf *original_cout;
-    std::streambuf *original_cerr;
+    std::streambuf *original_cout{};
+    std::streambuf *original_cerr{};
 
 
     CommandManagerTest() : agency_manager(&request_wrapper), mock_bookmark_manager(&agency_manager), mock_command_manager(&mock_bookmark_manager),
@@ -129,7 +129,7 @@ TEST_F(CommandManagerTest, Bookmark_DisplaysErrorForInvalidCommand) {
 
 // Test case: Correctly parses clear command
 TEST_F(CommandManagerTest, Clear) {
-    agency_manager.session_history.push_back({"query", "result"});
+    agency_manager.session_history.emplace_back("query", "result");
     std::string command = "clear";
 
     mock_command_manager.run_command(command);

@@ -1,16 +1,13 @@
 #include <readline/readline.h>
 #include <readline/history.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <iostream>
-#include <algorithm>
 #include <sstream>
 #include <vector>
 #include <agency_manager.hpp>
 #include <bookmark_manager.hpp>
 #include <agency_request_wrapper.hpp>
-
-#include <stdlib.h>
 
 #include "command_manager.hpp"
 
@@ -32,7 +29,7 @@ int agent_type = AGENT_ASSISTANT;
 void save_history(std::vector<std::string>& history_storage) {
     history_storage.clear();
     for (HIST_ENTRY **entry = history_list(); entry && *entry; ++entry) {
-        history_storage.push_back((*entry)->line);
+        history_storage.emplace_back((*entry)->line);
     }
 }
 
@@ -54,7 +51,7 @@ void line_handler(char *line) {
 
     if (agent_type == AGENT_ASSISTANT) {
         // New query to agent
-        std::string result = manager.execute_query(input_str);
+        const std::string result = manager.execute_query(input_str);
         std::cout << result << "\n";
     } else if (agent_type == AGENT_SYSTEM) {
         command_manager.run_command(input_str);
@@ -75,8 +72,8 @@ void agent() {
 
     bookmark_manager.load_bookmarks("local/bookmarks.json");
 
-    std::string assistant_name = "assistant";
-    std::string system_name = "system";
+    const std::string assistant_name = "assistant";
+    const std::string system_name = "system";
 
     while (running) {
         std::string agent_name;
@@ -92,9 +89,7 @@ void agent() {
         while (running) {
             rl_callback_read_char();
 
-            int pos = rl_point;
-
-            if (pos > 0 && rl_line_buffer[pos - 1] == '\t') {
+            if (const int pos = rl_point; pos > 0 && rl_line_buffer[pos - 1] == '\t') {
                 // Erase last character, break out, switch agent type
                 rl_delete_text(pos - 1, pos);
                 rl_point = rl_end;

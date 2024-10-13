@@ -2,21 +2,18 @@
 #include <sstream>
 #include <iostream>
 #include <iomanip>
-#include <algorithm>
 #include <unordered_map>
-#include <readline/readline.h>
-#include <readline/history.h>
 #include "../nlohmann/json.hpp"
 #include <bookmark_manager.hpp>
 #include <agency_manager.hpp>
 
 using json = nlohmann::json;
 
-BookmarkManager::BookmarkManager(AgencyManager* agencyManager) {
-  agency_manager = agencyManager;
+BookmarkManager::BookmarkManager(AgencyManager* agency_manager) {
+  this->agency_manager = agency_manager;
 }
 
-BookmarkManager::~BookmarkManager() {}
+BookmarkManager::~BookmarkManager() = default;
 
 bool BookmarkManager::create_bookmarks_file(const std::string &filename) {
     std::ofstream create_file(filename);
@@ -24,15 +21,15 @@ bool BookmarkManager::create_bookmarks_file(const std::string &filename) {
         std::cerr << "Error creating file: " << filename << "\n";
         return false;
     }
-    json empty_bookmarks = json::array();
+    const json empty_bookmarks = json::array();
     create_file << empty_bookmarks.dump(4);
     return true;
 }
 
 void BookmarkManager::parse_bookmark_json(const json &bookmark) {
-    std::string alias = bookmark.at("alias").get<std::string>();
-    std::string query = bookmark.at("query").get<std::string>();
-    std::string result = bookmark.at("result").get<std::string>();
+    const auto alias = bookmark.at("alias").get<std::string>();
+    const auto query = bookmark.at("query").get<std::string>();
+    const auto result = bookmark.at("result").get<std::string>();
     bookmarks[alias] = {query, result};
 }
 
@@ -73,8 +70,7 @@ bool BookmarkManager::is_bookmark(const std::string &alias) const {
 }
 
 std::pair<std::string, std::string> BookmarkManager::get_bookmark(const std::string &alias) const {
-    auto it = bookmarks.find(alias);
-    if (it != bookmarks.end()) {
+    if (const auto it = bookmarks.find(alias); it != bookmarks.end()) {
         return it->second; // Return the value if found
     }
     return {"", ""}; // Return an empty pair if not found
@@ -88,7 +84,7 @@ void BookmarkManager::bookmark(int index, const std::string &alias) {
     }
 
     // find <query, result> pair
-    int len = agency_manager->session_history.size();
+   const int len = static_cast<int>(agency_manager->session_history.size());
     if (index <= 0 || index > len) {
         std::cerr << "Error: Invalid history index.\n";
         return;
@@ -102,8 +98,7 @@ void BookmarkManager::bookmark(int index, const std::string &alias) {
 }
 
 void BookmarkManager::remove_bookmark(const std::string &alias) {
-    std::unordered_map<std::string, std::pair<std::string, std::string>>::iterator it = bookmarks.find(alias);
-    if (it != bookmarks.end()) {
+    if (const auto it = bookmarks.find(alias); it != bookmarks.end()) {
         bookmarks.erase(it);
         std::cout << "Removed bookmark '" << alias << "'.\n";
     } else {
@@ -113,13 +108,13 @@ void BookmarkManager::remove_bookmark(const std::string &alias) {
 }
 
 void BookmarkManager::list_bookmarks() const {
-    const int alias_width = 20;
-    const int query_width = 50;
+    constexpr int alias_width = 20;
+    constexpr int query_width = 50;
     std::cout << std::left << std::setw(alias_width) << "BOOKMARK"
               << std::setw(query_width) << "QUERY" << "\n";
-    for (std::unordered_map<std::string, std::pair<std::string, std::string>>::const_iterator it = bookmarks.begin(); it != bookmarks.end(); ++it) {
-        std::cout << std::left << std::setw(alias_width) << it->first
-                  << std::setw(query_width) << it->second.first
+    for (const auto &[fst, snd] : bookmarks) {
+        std::cout << std::left << std::setw(alias_width) << fst
+                  << std::setw(query_width) << snd.first
                   << "\n";
     }
 }

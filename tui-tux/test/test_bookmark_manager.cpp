@@ -10,16 +10,16 @@
 
 #define MOCK_BOOKMARS_SIZE 1
 
-class MockAgencyManager : public AgencyManager {
+class MockAgencyManager final : public AgencyManager {
 public:
-    MockAgencyManager(AgencyRequestWrapper* request_wrapper) : AgencyManager(request_wrapper) {}
+    explicit MockAgencyManager(AgencyRequestWrapper* request_wrapper) : AgencyManager(request_wrapper) {}
 
     MOCK_METHOD(std::string, execute_query, (const std::string &query), (override));
 };
 
-class MockBaseBookmarkManager : public BookmarkManager {
+class MockBaseBookmarkManager final : public BookmarkManager {
 public:
-    MockBaseBookmarkManager(AgencyManager* agency_mgr) : BookmarkManager(agency_mgr) {}
+    explicit MockBaseBookmarkManager(AgencyManager* agency_mgr) : BookmarkManager(agency_mgr) {}
 };
 
 class BookmarkTest : public ::testing::Test {
@@ -31,8 +31,8 @@ protected:
     std::stringstream output_stream;
     std::stringstream error_stream;
 
-    std::streambuf *original_cout;
-    std::streambuf *original_cerr;
+    std::streambuf *original_cout{};
+    std::streambuf *original_cerr{};
 
     BookmarkTest()
         : mock_agency_manager(&request_wrapper),
@@ -49,8 +49,8 @@ protected:
         mock_base_bookmark_manager.bookmarks.clear();
         mock_base_bookmark_manager.bookmarks["alias1"] = {"query1", "result1"};
         mock_agency_manager.session_history.clear();
-        mock_agency_manager.session_history.push_back({"query1", "result1"});
-        mock_agency_manager.session_history.push_back({"query2", "result2"});
+        mock_agency_manager.session_history.emplace_back("query1", "result1");
+        mock_agency_manager.session_history.emplace_back("query2", "result2");
     }
 
     void TearDown() override {
@@ -113,27 +113,11 @@ TEST_F(BookmarkTest, ListBookmarks_ListsAllExistingBookmarksCorrectly) {
     // act
     mock_base_bookmark_manager.list_bookmarks();
     // assert
-    std::string expected_output =
+    const std::string expected_output =
         "BOOKMARK            QUERY                                             \n"
         "alias1              query1                                            \n";
     EXPECT_EQ(output_stream.str(), expected_output);
 }
-
-// // Test case: Displays error if the documentation file cannot be found.
-// TEST_F(BookmarkTest, Help_DisplaysErrorWhenFileNotFound) {
-//     // act
-//     mock_bookmark_manager.help("manuals/temp_bookmark.txt");
-//     // assert
-//     EXPECT_EQ(error_stream.str(), "Error: Could not find the documentation.\n");
-// }
-
-// // Test case: Correctly handles help flag and displays help.
-// TEST_F(BookmarkTest, HandleBookmarkCommand_DisplaysHelp) {
-//     // act
-//     mock_bookmark_manager.handle_bookmark_command("bookmark --help", session_history);
-//     // assert
-//     EXPECT_NE(error_stream.str(), "Error: Could not find the documentation.");
-// }
 
 // Test case: Successfully creates a new bookmark file.
 TEST_F(BookmarkTest, CreateBookmarksFile_SuccessfullyCreatesNewFile) {
@@ -155,7 +139,7 @@ TEST_F(BookmarkTest, CreateBookmarksFile_SuccessfullyCreatesNewFile) {
 // Test case: Fails to create a new bookmark file (invalid file path).
 TEST_F(BookmarkTest, CreateBookmarksFile_FailsToCreateFileWithInvalidPath) {
     // act
-    bool result = mock_base_bookmark_manager.create_bookmarks_file("/invalid/path/bookmarks_test.json");
+    const bool result = mock_base_bookmark_manager.create_bookmarks_file("/invalid/path/bookmarks_test.json");
     // assert
     EXPECT_FALSE(result);
     EXPECT_EQ(error_stream.str(), "Error creating file: /invalid/path/bookmarks_test.json\n");
@@ -164,7 +148,7 @@ TEST_F(BookmarkTest, CreateBookmarksFile_FailsToCreateFileWithInvalidPath) {
 // Test case: Successfully parses valid JSON object into bookmarks.
 TEST_F(BookmarkTest, ParseBookmarkJson_SuccessfullyParsesValidJson) {
     // arrange
-    json valid_json = {
+    const json valid_json = {
         {"alias", "alias1"},
         {"query", "query1"},
         {"result", "result1"}
@@ -179,7 +163,7 @@ TEST_F(BookmarkTest, ParseBookmarkJson_SuccessfullyParsesValidJson) {
 // Test case: Fails to parse invalid JSON object (missing fields).
 TEST_F(BookmarkTest, ParseBookmarkJson_FailsToParseInvalidJson) {
     // arrange (missing result field)
-    json invalid_json = {
+    const json invalid_json = {
         {"alias", "alias1"},
         {"query", "query1"}
 
@@ -199,9 +183,9 @@ TEST_F(BookmarkTest, ParseBookmarkJson_FailsToParseInvalidJson) {
 // Test case: Successfully loads bookmarks from existing file.
 TEST_F(BookmarkTest, LoadBookmarks_SucessfullyLoadsBookmarks) {
     // arrange
-    std::string filename = "bookmarks.json";
+    const std::string filename = "bookmarks.json";
     std::ofstream empty_file(filename);
-    empty_file << "[{\"alias\": \"alias\", \"query\": \"query\", \"result\": \"result\"}]";
+    empty_file << R"([{"alias": "alias", "query": "query", "result": "result"}])";
     empty_file.close();
     // act
     mock_base_bookmark_manager.load_bookmarks(filename);
@@ -214,7 +198,7 @@ TEST_F(BookmarkTest, LoadBookmarks_SucessfullyLoadsBookmarks) {
 // Test case: Fails to load bookmarks if the file does not exist, and creates a new file.
 TEST_F(BookmarkTest, LoadBookmarks_CreatesNewFileIfNotExist) {
     // arrange
-    std::string filename = "non_existing_bookmarks.json";
+    const std::string filename = "non_existing_bookmarks.json";
     // act
     mock_base_bookmark_manager.load_bookmarks(filename);
     // assert
@@ -261,7 +245,7 @@ TEST_F(BookmarkTest, SaveBookmarks_SuccessfullySavesToFile) {
 // Test case: Fails to save bookmarks if the file cannot be opened (read-only file).
 TEST_F(BookmarkTest, SaveBookmarks_FailsToOpenReadOnlyFile) {
     // arrange
-    std::string filename = "bookmarks.json";
+    const std::string filename = "bookmarks.json";
     std::ofstream file(filename);
     file.close();
     chmod(filename.c_str(), 0444);  // make the file read-only
@@ -288,17 +272,17 @@ TEST_F(BookmarkTest, IsBookmark_NonExistentBookmark) {
 // Test case: Retrieves bookmark by alias.
 TEST_F(BookmarkTest, GetBookmark_ExistingAlias) {
     // act
-    std::pair<std::string, std::string> bookmark = mock_base_bookmark_manager.get_bookmark("alias1");
+    auto [fst, snd] = mock_base_bookmark_manager.get_bookmark("alias1");
     // assert
-    EXPECT_EQ(bookmark.first, "query1");
-    EXPECT_EQ(bookmark.second, "result1");
+    EXPECT_EQ(fst, "query1");
+    EXPECT_EQ(snd, "result1");
 }
 
 // Test case: Returns empty pair for non-existent alias.
 TEST_F(BookmarkTest, GetBookmark_NonExistentAlias) {
     // act
-    std::pair<std::string, std::string> bookmark = mock_base_bookmark_manager.get_bookmark("non_existent_alias");
+    auto [fst, snd] = mock_base_bookmark_manager.get_bookmark("non_existent_alias");
     // assert
-    EXPECT_EQ(bookmark.first, "");
-    EXPECT_EQ(bookmark.second, "");
+    EXPECT_EQ(fst, "");
+    EXPECT_EQ(snd, "");
 }

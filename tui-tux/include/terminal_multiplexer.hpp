@@ -19,15 +19,15 @@ private:
     bool waiting_for_command = false;
     bool zoomed_in = false;
 
-    WINDOW *bottom_bar = NULL, *middle_divider = NULL;
+    WINDOW *bottom_bar = nullptr, *middle_divider = nullptr;
 
     std::vector<Screen> screens;
     std::vector<WINDOW *> windows;
 
     void init();
     void init_nc();
-    void refresh_cursor();
-    void draw_focus();
+    void refresh_cursor() const;
+    void draw_focus() const;
     void switch_focus();
     void create_wins_draw();
     void delete_windows();
@@ -35,9 +35,10 @@ private:
     void send_dims();
     void resize();
     void run_terminal();
-    int handle_screen_output(Screen &screen, int fd);
+    int handle_screen_output(Screen &screen, int fd) const;
     int handle_input();
-    void handle_pty_input(int fd, char ch);
+
+    static void handle_pty_input(int fd, char ch);
     void zoom_in();
     void zoom_out();
     void toggle_manual_scroll();

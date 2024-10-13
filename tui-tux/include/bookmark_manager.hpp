@@ -3,7 +3,6 @@
 
 #include <unordered_map>
 #include <string>
-#include <vector>
 #include <utility>
 #include "../nlohmann/json.hpp"
 #include <agency_manager.hpp>
@@ -13,9 +12,9 @@ using json = nlohmann::json;
 class BookmarkManager {
 
 public:
-    AgencyManager *agency_manager;
+    AgencyManager *agency_manager{};
 
-    BookmarkManager(AgencyManager *agency_manager);
+    explicit BookmarkManager(AgencyManager *agency_manager);
     virtual ~BookmarkManager();
 
     virtual void load_bookmarks(const std::string &filename);

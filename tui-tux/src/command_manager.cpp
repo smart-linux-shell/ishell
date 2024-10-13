@@ -11,14 +11,12 @@ CommandManager::CommandManager(BookmarkManager *bookmark_manager) {
 }
 
 void CommandManager::run_command(std::string &command) {
-    std::vector<std::string> words = split(command, ' ', true);
-
-    if (!words.empty()) {
-        std::vector args(words.begin() + 1, words.end());
-        for (auto &mapped_command : command_map) {
+    if (std::vector<std::string> words = split(command, ' ', true); !words.empty()) {
+        const std::vector args(words.begin() + 1, words.end());
+        for (auto &[command_name, command_function] : command_map) {
             // pair: (command name, command function accepting args)
-            if (mapped_command.first == words[0]) {
-                (this->*mapped_command.second)(args);
+            if (command_name == words[0]) {
+                (this->*command_function)(args);
                 return;
             }
         }
@@ -34,12 +32,12 @@ void CommandManager::run_command(std::string &command) {
 }
 
 void CommandManager::run_alias(std::string &alias) {
-    std::pair<std::string, std::string> bookmark = bookmark_manager->get_bookmark(alias);
+    const std::pair<std::string, std::string> bookmark = bookmark_manager->get_bookmark(alias);
     bookmark_manager->agency_manager->session_history.push_back(bookmark);
     std::cout << bookmark.second << "\n";
 }
 
-void CommandManager::clear(std::vector<std::string> &args) {
+void CommandManager::clear(const std::vector<std::string> &args) {
     if (args.empty()) {
         bookmark_manager->agency_manager->session_history.clear();
         std::cout << "Cleared session history.\n\n";
@@ -63,11 +61,10 @@ int CommandManager::read_from_file(std::string &filepath, std::string &output) {
     return 0;
 }
 
-void CommandManager::bookmark(std::vector<std::string> &args) {
+void CommandManager::bookmark(const std::vector<std::string> &args) {
     if (args.size() > 1 && (args[0] == "-r" || args[0] == "--remove")) {
-        std::vector<std::string> split_alias = std::vector(args.begin() + 1, args.end());
-        std::string alias = join(split_alias, ' ');
-        if (bookmark_manager->is_bookmark(alias)) {
+        auto split_alias = std::vector(args.begin() + 1, args.end());
+        if (const std::string alias = join(split_alias, ' '); bookmark_manager->is_bookmark(alias)) {
             bookmark_manager->remove_bookmark(alias);
         }
 
@@ -98,11 +95,11 @@ void CommandManager::bookmark(std::vector<std::string> &args) {
             try {
                 index = std::stoi(args[0]);
                 alias_begin_index++;
-            } catch (std::invalid_argument &e) {}
+            } catch ([[maybe_unused]] std::invalid_argument &e) {}
         }
 
-        std::vector<std::string> split_alias = std::vector(args.begin() + alias_begin_index, args.end());
-        std::string alias = join(split_alias, ' ');
+        auto split_alias = std::vector(args.begin() + alias_begin_index, args.end());
+        const std::string alias = join(split_alias, ' ');
 
         if (bookmark_manager->is_bookmark(alias) || command_map.find(alias) != command_map.end()) {
             std::cerr << "Error: Alias already in use.\n";

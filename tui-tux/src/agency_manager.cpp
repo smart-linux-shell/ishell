@@ -7,7 +7,7 @@ AgencyManager::AgencyManager(AgencyRequestWrapper* request_wrapper)
     get_agency_url();
 }
 
-AgencyManager::~AgencyManager() {}
+AgencyManager::~AgencyManager() = default;
 
 void AgencyManager::get_agency_url() {
     agency_url_env = getenv("ISHELL_AGENCY_URL");
@@ -24,6 +24,6 @@ std::string AgencyManager::execute_query(const std::string &query) {
         return "";
     }
     std::string result = request_wrapper->ask_agent(assistant_url, query, session_history);
-    session_history.push_back({query, result});
+    session_history.emplace_back(query, result);
     return result;
 }
