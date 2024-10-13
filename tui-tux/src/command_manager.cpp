@@ -1,6 +1,10 @@
 #include <command_manager.hpp>
+#include <fstream>
 #include <utils.hpp>
 #include <iostream>
+
+#define MANUALS_PATH_1 "/etc/ishell/manuals"
+#define MANUALS_PATH_2 "manuals"
 
 CommandManager::CommandManager(BookmarkManager *bookmark_manager) {
     this->bookmark_manager = bookmark_manager;
@@ -25,7 +29,7 @@ void CommandManager::run_command(std::string &command) {
             return;
         }
 
-        std::cerr << "Command not found!\n";
+        std::cerr << "Error: Command not found!\n";
     }
 }
 
@@ -36,8 +40,27 @@ void CommandManager::run_alias(std::string &alias) {
 }
 
 void CommandManager::clear(std::vector<std::string> &args) {
-    bookmark_manager->agency_manager->session_history.clear();
-    std::cout << "Cleared session history.\n\n";
+    if (args.empty()) {
+        bookmark_manager->agency_manager->session_history.clear();
+        std::cout << "Cleared session history.\n\n";
+    }
+}
+
+int CommandManager::read_from_file(std::string &filepath, std::string &output) {
+    std::ifstream file(filepath);
+
+    if (!file.is_open()) {
+        return -1;
+    }
+
+    output = "";
+    std::string line;
+    while (std::getline(file, line)) {
+        output += line + "\n";
+    }
+
+    file.close();
+    return 0;
 }
 
 void CommandManager::bookmark(std::vector<std::string> &args) {
@@ -50,6 +73,24 @@ void CommandManager::bookmark(std::vector<std::string> &args) {
 
     } else if (args.size() == 1 && (args[0] == "-l" || args[0] == "--list")) {
         bookmark_manager->list_bookmarks();
+    } else if (args.size() == 1 && args[0] == "--help") {
+        // Try both paths
+        std::string help_message;
+        std::string path = std::string(MANUALS_PATH_1) + std::string("/bookmark.txt");
+        int rc = read_from_file(path, help_message);
+        if (rc == 0) {
+            std::cout << help_message;
+            return;
+        }
+
+        path = std::string(MANUALS_PATH_2) + std::string("/bookmark.txt");
+        rc = read_from_file(path, help_message);
+        if (rc == 0) {
+            std::cout << help_message;
+            return;
+        }
+
+        std::cerr << "Error: Could not find manual page 'bookmark.txt'.\n";
     } else if (!args.empty()) {
         int index = 1;          // default index if not provided
         int alias_begin_index = 0;
@@ -64,7 +105,7 @@ void CommandManager::bookmark(std::vector<std::string> &args) {
         std::string alias = join(split_alias, ' ');
 
         if (bookmark_manager->is_bookmark(alias) || command_map.find(alias) != command_map.end()) {
-            std::cerr << "Alias already in use.\n";
+            std::cerr << "Error: Alias already in use.\n";
             return;
         }
 
@@ -72,7 +113,7 @@ void CommandManager::bookmark(std::vector<std::string> &args) {
 
         std::cout << "Bookmarked " << alias << " at index " << index << ".\n";
     } else {
-        std::cerr << "Wrong command syntax.\n";
+        std::cerr << "Error: Invalid bookmark command format. Try bookmark --help.\n";
     }
 }
 
