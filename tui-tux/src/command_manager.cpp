@@ -44,6 +44,15 @@ void CommandManager::clear(const std::vector<std::string> &args) {
     }
 }
 
+void CommandManager::agent_switch(const std::vector<std::string> &args) {
+    if (args.size() > 1) {
+        std::cerr << "Error: Invalid syntax. Usage: switch <agent name>\n";
+        return;
+    }
+
+    bookmark_manager->agency_manager->set_agent_name(args[0]);
+}
+
 int CommandManager::read_from_file(std::string &filepath, std::string &output) {
     std::ifstream file(filepath);
 
@@ -107,8 +116,6 @@ void CommandManager::bookmark(const std::vector<std::string> &args) {
         }
 
         bookmark_manager->bookmark(index, alias);
-
-        std::cout << "Bookmarked " << alias << " at index " << index << ".\n";
     } else {
         std::cerr << "Error: Invalid bookmark command format. Try bookmark --help.\n";
     }

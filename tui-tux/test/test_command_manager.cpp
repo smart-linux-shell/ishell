@@ -1,12 +1,20 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include <agency_request_wrapper.hpp>
 #include <agency_manager.hpp>
 #include <bookmark_manager.hpp>
 #include <command_manager.hpp>
 #include <fstream>
 
 using namespace testing;
+
+class MockAgencyManager final : public AgencyManager {
+public:
+    explicit MockAgencyManager(AgencyRequestWrapper *agency_request_wrapper) : AgencyManager(agency_request_wrapper) {}
+
+    MOCK_METHOD(void, set_agent_name, (const std::string &agent_name), (override));
+};
 
 class MockBookmarkManager final : public BookmarkManager {
 public:
@@ -28,11 +36,12 @@ class CommandManagerTest : public Test {
 public:
     AgencyRequestWrapper request_wrapper;
     AgencyManager agency_manager;
-    MockBookmarkManager mock_bookmark_manager;
-    MockCommandManager mock_command_manager;
-
     BookmarkManager bookmark_manager;
     CommandManager command_manager;
+
+    MockAgencyManager mock_agency_manager;
+    MockBookmarkManager mock_bookmark_manager;
+    MockCommandManager mock_command_manager;
 
     std::stringstream output_stream;
     std::stringstream error_stream;
@@ -40,9 +49,7 @@ public:
     std::streambuf *original_cout{};
     std::streambuf *original_cerr{};
 
-
-    CommandManagerTest() : agency_manager(&request_wrapper), mock_bookmark_manager(&agency_manager), mock_command_manager(&mock_bookmark_manager),
-        bookmark_manager(&agency_manager), command_manager(&bookmark_manager) {}
+    CommandManagerTest() : agency_manager(&request_wrapper), bookmark_manager(&agency_manager), command_manager(&bookmark_manager), mock_agency_manager(&request_wrapper), mock_bookmark_manager(&mock_agency_manager), mock_command_manager(&mock_bookmark_manager) {}
 
     void SetUp() override {
         // redirect std::cout to output_stream
@@ -55,6 +62,7 @@ public:
         mock_bookmark_manager.bookmarks.clear();
         mock_bookmark_manager.bookmarks["alias1"] = {"query1", "result1"};
         agency_manager.session_history.clear();
+        mock_agency_manager.session_history.clear();
     }
 
     void TearDown() override {
@@ -129,7 +137,7 @@ TEST_F(CommandManagerTest, Bookmark_DisplaysErrorForInvalidCommand) {
 
 // Test case: Correctly parses clear command
 TEST_F(CommandManagerTest, Clear) {
-    agency_manager.session_history.emplace_back("query", "result");
+    mock_agency_manager.session_history.emplace_back("query", "result");
     std::string command = "clear";
 
     mock_command_manager.run_command(command);
@@ -180,4 +188,16 @@ TEST_F(CommandManagerTest, HelpError) {
     mock_command_manager.run_command(command);
 
     EXPECT_TRUE(error_stream.str().find("Error") != std::string::npos);
+}
+
+// Test case: Agent switching works correctly.
+TEST_F(CommandManagerTest, Switch) {
+    setenv("ISHELL_AGENCY_URL", "localhost", 1);
+
+    std::string command = "switch inspector";
+    mock_command_manager.run_command(command);
+
+    unsetenv("ISHELL_AGENCY_ENV");
+
+    EXPECT_EQ(mock_agency_manager.agent_name, "inspector");
 }

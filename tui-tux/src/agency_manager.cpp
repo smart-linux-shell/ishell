@@ -22,6 +22,14 @@ std::string AgencyManager::get_agency_url() {
     return agency_url;
 }
 
+std::string AgencyManager::get_agent_name() const {
+    return agent_name;
+}
+
+void AgencyManager::set_agent_name(const std::string &agent_name) {
+    this->agent_name = agent_name;
+}
+
 std::string AgencyManager::execute_query(const std::string &endpoint, const std::string &query) {
     std::string result = request_wrapper->ask_agent(endpoint, query, session_history);
     session_history.emplace_back(query, result);

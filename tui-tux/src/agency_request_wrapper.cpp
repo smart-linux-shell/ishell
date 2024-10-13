@@ -69,7 +69,7 @@ json AgencyRequestWrapper::send_request_to_agent_server(const std::string& url, 
     std::string ssh_user = get_ssh_user();
     std::string history = get_session_history_string(session_history);
 
-    json request_body = {
+    const json request_body = {
         {"distro", distro},
         {"installed_packages", installed_packages},
         {"query", user_query},
@@ -79,7 +79,7 @@ json AgencyRequestWrapper::send_request_to_agent_server(const std::string& url, 
         {"ssh_user", ssh_user}
     };
 
-    std::map<std::string, std::string> headers = {
+    const std::map<std::string, std::string> headers = {
         {"Content-Type", "application/json"}
     };
 
@@ -97,14 +97,12 @@ std::string AgencyRequestWrapper::ask_agent(const std::string& url, const std::s
         return "";
     }
 
-    json response_body = response["body"];
-
-    if (response_body.contains("content")) {
+    if (json response_body = response["body"]; response_body.contains("content")) {
         return response_body["content"].get<std::string>();
-    } else {
-        std::cerr << "\"content\" field not found in response body" << std::endl;
-        return "";
     }
+
+    std::cerr << "\"content\" field not found in response body" << std::endl;
+    return "";
 }
 
 json AgencyRequestWrapper::make_http_request(const HttpRequestType request_type, const std::string& url,

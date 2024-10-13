@@ -25,7 +25,6 @@ CommandManager command_manager(&bookmark_manager);
 
 bool running = true;
 int prompt_mode = MODE_AGENT;
-std::string agent_name = "assistant";
 
 void save_history(std::vector<std::string>& history_storage) {
     history_storage.clear();
@@ -53,7 +52,7 @@ void line_handler(char *line) {
     if (prompt_mode == MODE_AGENT) {
         // New query to agent
         const std::string agency = manager.get_agency_url();
-        const std::string result = manager.execute_query(agency + "/" + agent_name, input_str);
+        const std::string result = manager.execute_query(agency + "/" + bookmark_manager.agency_manager->get_agent_name(), input_str);
         std::cout << result << "\n";
     } else if (prompt_mode == MODE_SYSTEM) {
         command_manager.run_command(input_str);
@@ -74,13 +73,12 @@ void agent() {
 
     bookmark_manager.load_bookmarks("local/bookmarks.json");
 
-    const std::string assistant_name = "assistant";
     const std::string system_name = "system";
 
     while (running) {
         std::string agent_name;
         if (prompt_mode == MODE_AGENT) {
-            agent_name = assistant_name;
+            agent_name = bookmark_manager.agency_manager->get_agent_name();
         } else if (prompt_mode == MODE_SYSTEM) {
             agent_name = system_name;
         }
