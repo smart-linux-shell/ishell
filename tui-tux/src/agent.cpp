@@ -11,8 +11,8 @@
 
 #include "command_manager.hpp"
 
-#define AGENT_SYSTEM 0
-#define AGENT_ASSISTANT 1
+#define MODE_SYSTEM 0
+#define MODE_AGENT 1
 #define N_AGENTS 2
 
 // Global variables are unfortunately needed because of readline limitations
@@ -24,7 +24,8 @@ BookmarkManager bookmark_manager(&manager);
 CommandManager command_manager(&bookmark_manager);
 
 bool running = true;
-int agent_type = AGENT_ASSISTANT;
+int prompt_mode = MODE_AGENT;
+std::string agent_name = "assistant";
 
 void save_history(std::vector<std::string>& history_storage) {
     history_storage.clear();
@@ -49,11 +50,12 @@ void line_handler(char *line) {
     std::string input_str(line);
     add_history(line);
 
-    if (agent_type == AGENT_ASSISTANT) {
+    if (prompt_mode == MODE_AGENT) {
         // New query to agent
-        const std::string result = manager.execute_query(input_str);
+        const std::string agency = manager.get_agency_url();
+        const std::string result = manager.execute_query(agency + "/" + agent_name, input_str);
         std::cout << result << "\n";
-    } else if (agent_type == AGENT_SYSTEM) {
+    } else if (prompt_mode == MODE_SYSTEM) {
         command_manager.run_command(input_str);
     }
 
@@ -77,9 +79,9 @@ void agent() {
 
     while (running) {
         std::string agent_name;
-        if (agent_type == AGENT_ASSISTANT) {
+        if (prompt_mode == MODE_AGENT) {
             agent_name = assistant_name;
-        } else if (agent_type == AGENT_SYSTEM) {
+        } else if (prompt_mode == MODE_SYSTEM) {
             agent_name = system_name;
         }
 
@@ -94,9 +96,9 @@ void agent() {
                 rl_delete_text(pos - 1, pos);
                 rl_point = rl_end;
                 rl_redisplay();
-                save_history(history_storage[agent_type]);
-                agent_type = (agent_type + 1) % N_AGENTS;
-                load_history(history_storage[agent_type]);
+                save_history(history_storage[prompt_mode]);
+                prompt_mode = (prompt_mode + 1) % N_AGENTS;
+                load_history(history_storage[prompt_mode]);
                 break;
             }
         }

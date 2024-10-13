@@ -1,29 +1,30 @@
 #include <cstdlib>
-#include <iostream>
 #include <agency_manager.hpp>
 
+#include <utils.hpp>
+
 AgencyManager::AgencyManager(AgencyRequestWrapper* request_wrapper)
-    : agency_url_set(false), request_wrapper(request_wrapper) {
-    get_agency_url();
+    : request_wrapper(request_wrapper) {
 }
 
 AgencyManager::~AgencyManager() = default;
 
-void AgencyManager::get_agency_url() {
-    agency_url_env = getenv("ISHELL_AGENCY_URL");
-    if (agency_url_env != nullptr) {
+std::string AgencyManager::get_agency_url() {
+    if (!agency_url_set) {
+        if (const char *agency_url_env = getenv("ISHELL_AGENCY_URL"); agency_url_env != nullptr) {
+            agency_url = agency_url_env;
+        } else {
+            agency_url = DEFAULT_AGENCY_URL;
+        }
         agency_url_set = true;
-        agency_url = agency_url_env;
-        assistant_url = agency_url + "/assistant";
     }
+
+    return agency_url;
 }
 
-std::string AgencyManager::execute_query(const std::string &query) {
-    if (!agency_url_set) {
-        std::cerr << "ISHELL_AGENCY_URL not set\n";
-        return "";
-    }
-    std::string result = request_wrapper->ask_agent(assistant_url, query, session_history);
+std::string AgencyManager::execute_query(const std::string &endpoint, const std::string &query) {
+    std::string result = request_wrapper->ask_agent(endpoint, query, session_history);
     session_history.emplace_back(query, result);
+
     return result;
 }

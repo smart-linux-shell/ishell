@@ -22,4 +22,7 @@
 std::vector<std::string> split(std::string &str, char delim, bool ignore_empty);
 std::string join(std::vector<std::string> &words, char delim);
 
+#define DEFAULT_AGENCY_URL "https://ishell-stage.csai.site/agents"
+#define DEFAULT_ISHELL_LOCAL_DIR "/etc/ishell"
+
 #endif

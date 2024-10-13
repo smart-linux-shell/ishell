@@ -10,13 +10,12 @@ public:
     explicit AgencyManager(AgencyRequestWrapper* request_wrapper);
     virtual ~AgencyManager();
 
-    void get_agency_url();
-    virtual std::string execute_query(const std::string &query);
+    std::string get_agency_url();
+    virtual std::string execute_query(const std::string &endpoint, const std::string &query);
 
-    bool agency_url_set;
     std::string agency_url;
-    std::string assistant_url;
-    const char* agency_url_env{};
+    bool agency_url_set = false;
+
     AgencyRequestWrapper* request_wrapper;
 
     // <query, result>

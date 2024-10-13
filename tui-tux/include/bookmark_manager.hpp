@@ -17,6 +17,8 @@ public:
     explicit BookmarkManager(AgencyManager *agency_manager);
     virtual ~BookmarkManager();
 
+    virtual std::string get_bookmarks_file_path();
+
     virtual void load_bookmarks(const std::string &filename);
     virtual void save_bookmarks(const std::string &filename);
 

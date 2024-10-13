@@ -6,6 +6,8 @@
 #include <agency_manager.hpp>
 #include <agency_request_wrapper.hpp>
 
+#include <utils.hpp>
+
 class MockAgencyRequestWrapper final : public AgencyRequestWrapper {
 public:
     MOCK_METHOD(std::string, ask_agent, (const std::string& url, const std::string& query, (std::vector<std::pair<std::string, std::string>> &session_history)), (override));
@@ -42,41 +44,30 @@ TEST_F(AgencyManagerTest, GetAgencyUrl_SuccessfullySetsUrl) {
     // arrange
     setenv("ISHELL_AGENCY_URL", "http://localhost:5000", 1);
     // act
-    agency_manager.get_agency_url();
+    const std::string url = agency_manager.get_agency_url();
     // assert
-    EXPECT_TRUE(agency_manager.agency_url_set);
-    EXPECT_EQ(agency_manager.agency_url, "http://localhost:5000");
-    EXPECT_EQ(agency_manager.assistant_url, "http://localhost:5000/assistant");
+    EXPECT_EQ(url, "http://localhost:5000");
 }
 
-// Test case: Does not set the agency URL when ISHELL_AGENCY_URL environment variable is not present.
+// Test case: Correctly sets the agency URL when ISHELL_AGENCY_URL environment variable is not present.
 TEST_F(AgencyManagerTest, GetAgencyUrl_NoUrlSet) {
     // act
-    agency_manager.get_agency_url();
+    const std::string url = agency_manager.get_agency_url();
     // assert
-    EXPECT_FALSE(agency_manager.agency_url_set);
-    EXPECT_EQ(agency_manager.agency_url, "");
-    EXPECT_EQ(agency_manager.assistant_url, "");
-}
 
-// Test case: Returns error message when ISHELL_AGENCY_URL is not set.
-TEST_F(AgencyManagerTest, ExecuteQuery_AgencyUrlNotSet) {
-    // act
-    const std::string result = agency_manager.execute_query("test query");
-    // assert
-    EXPECT_EQ(result, "");
-    EXPECT_EQ(agency_manager.session_history.size(), 0);  // No history added
+    const std::string expected_agency(DEFAULT_AGENCY_URL);
+    EXPECT_EQ(url, expected_agency);
 }
 
 // Test case: Successfully calls ask_agent and returns the agent's result when the agency URL is set.
 TEST_F(AgencyManagerTest, ExecuteQuery_SuccessfullyCallsAgent) {
     // arrange
     setenv("ISHELL_AGENCY_URL", "http://localhost:5000", 1);
-    agency_manager.get_agency_url();
+    const std::string url = agency_manager.get_agency_url();
     EXPECT_CALL(mock_request_wrapper, ask_agent("http://localhost:5000/assistant", "test query", agency_manager.session_history))
         .WillOnce(::testing::Return("agent response"));
     // act
-    const std::string result = agency_manager.execute_query("test query");
+    const std::string result = agency_manager.execute_query(url + "/assistant", "test query");
     // assert
     EXPECT_EQ(result, "agent response");
 }
@@ -85,11 +76,11 @@ TEST_F(AgencyManagerTest, ExecuteQuery_SuccessfullyCallsAgent) {
 TEST_F(AgencyManagerTest, ExecuteQuery_AddsToSessionHistory) {
     // arrange
     setenv("ISHELL_AGENCY_URL", "http://localhost:5000", 1);
-    agency_manager.get_agency_url();
+    const std::string url = agency_manager.get_agency_url();
     EXPECT_CALL(mock_request_wrapper, ask_agent("http://localhost:5000/assistant", "test query", agency_manager.session_history))
         .WillOnce(::testing::Return("agent response"));
     // act
-    std::string result = agency_manager.execute_query("test query");
+    std::string result = agency_manager.execute_query(url + "/assistant", "test query");
     // assert
     ASSERT_EQ(agency_manager.session_history.size(), 1);
     EXPECT_EQ(agency_manager.session_history[0].first, "test query");
@@ -100,11 +91,11 @@ TEST_F(AgencyManagerTest, ExecuteQuery_AddsToSessionHistory) {
 TEST_F(AgencyManagerTest, ExecuteQuery_AskAgentFails) {
     // arrange
     setenv("ISHELL_AGENCY_URL", "http://localhost:5000", 1);
-    agency_manager.get_agency_url();
+    const std::string url = agency_manager.get_agency_url();
     EXPECT_CALL(mock_request_wrapper, ask_agent("http://localhost:5000/assistant", "test query", agency_manager.session_history))
         .WillOnce(::testing::Return(""));
     // act
-    const std::string result = agency_manager.execute_query("test query");
+    const std::string result = agency_manager.execute_query(url + "/assistant", "test query");
     // assert
     EXPECT_EQ(result, "");
     EXPECT_EQ(agency_manager.session_history.size(), 1);  // history is still recorded

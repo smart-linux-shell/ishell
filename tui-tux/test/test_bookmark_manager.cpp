@@ -14,7 +14,7 @@ class MockAgencyManager final : public AgencyManager {
 public:
     explicit MockAgencyManager(AgencyRequestWrapper* request_wrapper) : AgencyManager(request_wrapper) {}
 
-    MOCK_METHOD(std::string, execute_query, (const std::string &query), (override));
+    MOCK_METHOD(std::string, execute_query, (const std::string &endpoint, const std::string &query), (override));
 };
 
 class MockBaseBookmarkManager final : public BookmarkManager {

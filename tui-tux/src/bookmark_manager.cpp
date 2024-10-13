@@ -6,6 +6,7 @@
 #include "../nlohmann/json.hpp"
 #include <bookmark_manager.hpp>
 #include <agency_manager.hpp>
+#include <sys/stat.h>
 
 using json = nlohmann::json;
 
@@ -14,6 +15,32 @@ BookmarkManager::BookmarkManager(AgencyManager* agency_manager) {
 }
 
 BookmarkManager::~BookmarkManager() = default;
+
+std::string BookmarkManager::get_bookmarks_file_path() {
+    std::string file_path;
+    if (char *local_dir = getenv("ISHELL_LOCAL_DIR"); local_dir == nullptr) {
+        // Create a default directory (~/.ishell) if it does not exist
+        char *home_dir = getenv("HOME");
+        if (home_dir == nullptr) {
+            return file_path;
+        }
+
+        const std::string dir = std::string(home_dir) + "/.ishell";
+
+        struct stat st{};
+        if (stat(dir.c_str(), &st) != 0) {
+            // Directory does not exist: create it
+            mkdir(dir.c_str(), 0755);
+        }
+
+        // If any of the above steps failed, it will be caught when trying to write to the file
+        file_path = dir + "/bookmarks.json";
+    } else {
+        file_path = std::string(local_dir) + "/bookmarks.json";
+    }
+
+    return file_path;
+}
 
 bool BookmarkManager::create_bookmarks_file(const std::string &filename) {
     std::ofstream create_file(filename);
