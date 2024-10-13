@@ -18,7 +18,7 @@ std::string AgencyRequestWrapper::get_linux_distro() {
     if (uname(&buffer) != 0) {
         return "Unknown";
     }
-    return buffer.sysname; // or use buffer.release, buffer.version
+    return std::string(buffer.sysname) + std::string(" ") + std::string(buffer.version); // or use buffer.release, buffer.version
 }
 
 // Function to get installed packages (simple example using dpkg on Debian/Ubuntu systems)
@@ -38,7 +38,7 @@ std::vector<std::string> AgencyRequestWrapper::get_installed_packages() {
 
 // Function to get SSH IP, port, and user from environment variables (? might change ?)
 std::string AgencyRequestWrapper::get_ssh_ip() {
-    if (const char* ssh_ip = getenv("SSH_CLIENT")) {
+    if (const char* ssh_ip = getenv("SSH_IP")) {
         std::string ssh_ip_str(ssh_ip);
         return ssh_ip_str.substr(0, ssh_ip_str.find(' '));
     }
