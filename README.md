@@ -112,7 +112,13 @@ While focused on the agent window, special commands can be executed in System Mo
 
 ### Demo
 
-**[WIP]**
+Take a look at the this comprehensive demo that Iulian recorded:
+
+
+https://github.com/user-attachments/assets/85efd772-f5ad-4a71-a060-4004ae521306
+
+
+
 
 ### Tests
 
