@@ -79,9 +79,15 @@ json AgencyRequestWrapper::send_request_to_agent_server(const std::string& url, 
         {"ssh_user", ssh_user}
     };
 
-    const std::map<std::string, std::string> headers = {
-        {"Content-Type", "application/json"}
+    const char *token_env = getenv("ISHELL_TOKEN");
+
+    std::map<std::string, std::string> headers = {
+        {"Content-Type", "application/json"},
     };
+
+    if (token_env != nullptr) {
+        headers.emplace("Authorization", std::string("token ") + std::string(token_env));
+    }
 
     json response = make_http_request(HttpRequestType::POST, url, {}, request_body, headers);
 

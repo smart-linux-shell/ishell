@@ -72,6 +72,7 @@ cd ishell
 - `ISHELL_LOCAL_DIR` - directory for local files (**optional** - by default creates and uses `~/.ishell`)
 - `SSH_IP` - IP address for SSH server running on the user's system (**required** - for inspector agent)
 - `SSH_PORT` - port for SSH server runinng on the user's system (**required** - for inspector agent, by default `22`)
+- `ISHELL_TOKEN` - token to log into agency (**required** - authenticate with github on agency webpage at /login/github)
 
 ## Usage
 
