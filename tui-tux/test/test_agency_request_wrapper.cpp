@@ -96,6 +96,9 @@ TEST_F(AgencyRequestWrapperTest, EmptyFields) {
     EXPECT_CALL(mock_agency_request_wrapper2, getenv(StrEq("USER")))
         .WillOnce(Return(nullptr));
 
+    EXPECT_CALL(mock_agency_request_wrapper2, getenv(StrEq("ISHELL_TOKEN")))
+        .WillOnce(Return(nullptr));
+
     json request;
 
     json body = {
