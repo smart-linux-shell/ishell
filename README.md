@@ -129,5 +129,15 @@ To test, run:
 cd ishell
 ./run.sh -t # or --test
 ```
+#### Smoke Test
+As the deb package is not deployed yet, the smoke test is not automated. To ensure that the ishell works correctly, please:
+- Follow the installation guide and run the ishell.
+- Verify that the shell opens in split-screen mode (assistant at the top, bash at the bottom).
+- Run a simple bash command (e.g., `ls`) to check if bash is functional.
+- Ask a Linux-related query in the assistant section to ensure it responds correctly.
+- Use `Ctrl + TAB` to switch between the assistant and bash, confirming smooth switching.
+- Run interactive applications (e.g., `top`, `nano`) in bash and verify they work properly.
+- Exit the shell using `exit` and ensure both the assistant and bash terminate without issues.
+
 
 ### Happy Shelling 💻
