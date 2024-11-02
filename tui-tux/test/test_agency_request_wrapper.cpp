@@ -96,6 +96,9 @@ TEST_F(AgencyRequestWrapperTest, EmptyFields) {
     EXPECT_CALL(mock_agency_request_wrapper2, getenv(StrEq("USER")))
         .WillOnce(Return(nullptr));
 
+    EXPECT_CALL(mock_agency_request_wrapper2, getenv(StrEq("ISHELL_TOKEN")))
+        .WillOnce(Return(nullptr));
+
     json request;
 
     json body = {
@@ -208,10 +211,14 @@ TEST_F(AgencyRequestWrapperTest, ResponseError) {
 
     std::string response_error = "Test error";
 
+    json body = {
+        {"error", response_error}
+    };
+
     json response = {
         {"status_code", "200"},
         {"headers", {}},
-        {"error", response_error}
+        {"body", body}
     };
 
     EXPECT_CALL(mock_agency_request_wrapper1, make_http_request(_, _, _, _, _))
