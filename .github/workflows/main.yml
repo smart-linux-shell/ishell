@@ -1,0 +1,91 @@
+name: Build .deb and snap
+'on':
+  push:
+    branches:
+      - main
+jobs:
+  build_deb_snap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Download nlohmann/json
+        working-directory: ./tui-tux
+        run: |
+          mkdir -p nlohmann;
+          wget https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp -O "nlohmann/json.hpp"
+
+      - name: Install dependencies
+        run: sudo apt install -y libcurl4-openssl-dev libgmock-dev libgtest-dev libncurses-dev libreadline-dev
+
+      - name: Setup ishell-m terminal
+        run: tic ishell-m.info
+          
+      - name: Make app
+        working-directory: ./tui-tux 
+        run: make
+
+      - name: Make test
+        working-directory: ./tui-tux
+        run: make test
+      
+      - name: Run tests
+        working-directory: ./tui-tux
+        run: TERM=xterm ./test_ishell
+        
+      - name: Find version
+        working-directory: ./tui-tux
+        run: echo "VERSION=$(cat control | grep Version | cut -d' ' -f2)" >> $GITHUB_ENV
+        
+      - name: Create deb directory structure
+        working-directory: ./tui-tux
+        run: |
+          mkdir ishell_${VERSION}_amd64;
+          mkdir -p ishell_${VERSION}_amd64/usr/bin;
+          mkdir -p ishell_${VERSION}_amd64/usr/share/terminfo/source;
+          mkdir ishell_${VERSION}_amd64/DEBIAN
+          
+      - name: Copy files
+        working-directory: ./tui-tux
+        run: |
+          cp ishell ishell_${VERSION}_amd64/usr/bin/;
+          cp ../ishell-m.info ishell_${VERSION}_amd64/usr/share/terminfo/source/;
+          cp control ishell_${VERSION}_amd64/DEBIAN/;
+          cp postinst ishell_${VERSION}_amd64/DEBIAN/
+          
+      - name: Build deb
+        working-directory: ./tui-tux
+        run: dpkg --build ishell_${VERSION}_amd64/
+
+      # - name: Create snap file
+      #   uses: snapcore/action-build@v1
+      #   with:
+      #     path: ./tui-tux
+          
+      - name: Import Debian repository GPG key
+        run: echo "${{ secrets.DEB_GPG_KEY }}" | gpg --import
+          
+      - name: Create deb directory
+        working-directory: ./pkg
+        run: |
+          mkdir deb;
+          cp KEY.gpg deb/;
+          cp sources.list deb/
+          
+      - name: Copy .deb package
+        run: |
+          cp tui-tux/ishell_${VERSION}_amd64.deb pkg/deb/
+          
+      - name: Create Packages and Packages.gz
+        working-directory: ./pkg/deb
+        run: |
+          dpkg-scanpackages --multiversion . > Packages;
+          gzip -k -f Packages
+          
+      - name: Create Release, Release.gpg and InRelease
+        working-directory: ./pkg/deb
+        run: |
+          apt-ftparchive release . > Release;
+          gpg --default-key "ishell" -abs -o - Release > Release.gpg;
+          gpg --default-key "ishell" --clearsign -o - Release > InRelease 
