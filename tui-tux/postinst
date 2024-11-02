@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+
+# Check if terminal type ishell-m is already installed
+if ! infocmp ishell-m > /dev/null 2>&1; then
+    echo "Terminal type ishell-m not found. Installing..."
+    
+    # Use 'tic' to compile and install the terminal info
+    tic /usr/share/terminfo/source/ishell-m.info
+    
+    echo "Terminal type linux-m installed successfully."
+fi

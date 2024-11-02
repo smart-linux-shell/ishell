@@ -3,12 +3,11 @@
 #include <unistd.h>
 #include <unordered_map>
 
-#include <screen.hpp>
 #include <escape.hpp>
 
 #define READ_BUFSIZ 1024
 
-TerminalChar escape(std::string &seq) {
+TerminalChar escape(const std::string &seq) {
     // Check `infocmp linux-m`
 
     std::vector<std::pair<std::regex, int>> regexes = {
@@ -31,17 +30,17 @@ TerminalChar escape(std::string &seq) {
     ret.ch = 0;
     ret.sequence = seq;
 
-    for (std::pair<std::regex, int> &pair : regexes) {
-        if (std::regex_match(seq, matches, pair.first)) {
-            ret.ch = pair.second;
+    for (auto &[regex, key] : regexes) {
+        if (std::regex_match(seq, matches, regex)) {
+            ret.ch = key;
             for (size_t i = 1; i < matches.size(); i++) {
                 int arg;
 
                 try {
                     arg = std::stoi(matches[i].str());
-                } catch (const std::invalid_argument &e) {
+                } catch ([[maybe_unused]] const std::invalid_argument &e) {
                     continue;
-                } catch (const std::out_of_range &e) {
+                } catch ([[maybe_unused]] const std::out_of_range &e) {
                     continue;
                 }
 
@@ -55,9 +54,9 @@ TerminalChar escape(std::string &seq) {
     return ret;
 }
 
-int read_and_escape(int fd, std::vector<TerminalChar> &vec) {
+int read_and_escape(const int fd, std::vector<TerminalChar> &vec) {
     struct FdEscapeData {
-        bool in_escape;
+        bool in_escape{};
         std::string escape_seq;
     };
 
@@ -70,18 +69,18 @@ int read_and_escape(int fd, std::vector<TerminalChar> &vec) {
 
     char buf[READ_BUFSIZ];
 
-    int n = read(fd, buf, READ_BUFSIZ);
+    const ssize_t n = read(fd, buf, READ_BUFSIZ);
     if (n <= 0) {
-        return n;
+        return static_cast<int>(n);
     }
 
     vec = std::vector<TerminalChar>();
 
-    for (int i = 0; i < n; i++) {
+    for (ssize_t i = 0; i < n; i++) {
         // ESC sequence
         if (buf[i] == 0x1B) {
             fd_escape_data[fd].in_escape = true;
-            fd_escape_data[fd].escape_seq = 0x1B;
+            fd_escape_data[fd].escape_seq = "\x1B";
             continue;
         }
 
@@ -90,7 +89,7 @@ int read_and_escape(int fd, std::vector<TerminalChar> &vec) {
                 fd_escape_data[fd].escape_seq += buf[i];
             }
 
-            if ((buf[i] >= 0x40 && buf[i] <= 0x7E && buf[i] != '[') || (buf[i] == 0x9C)) {
+            if ((buf[i] >= 0x40 && buf[i] <= 0x7E && buf[i] != '[') || buf[i] == 0x9C) {
                 vec.push_back(escape(fd_escape_data[fd].escape_seq));
                 fd_escape_data[fd].in_escape = false;
                 fd_escape_data[fd].escape_seq = "";
@@ -103,5 +102,5 @@ int read_and_escape(int fd, std::vector<TerminalChar> &vec) {
         }
     }
 
-    return n;
+    return static_cast<int>(n);
 }

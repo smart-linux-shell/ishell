@@ -12,21 +12,20 @@ using namespace testing;
 
 class TerminalMultiplexerTest : public Test {
 public:
-    int stdin_to_app;
-    int child_pid;
+    int stdin_to_app{};
+    int child_pid{};
 
     void SetUp() override {
         int pipefd[2];
 
         // Create pipe for communication with app
-        int rc = pipe(pipefd);
-        if (rc < 0) {
+        if (const int rc = pipe(pipefd); rc < 0) {
             perror("pipe");
             exit(EXIT_FAILURE);
         }
 
         // Fork to run app in a separate process
-        int pid = fork();
+        const int pid = fork();
 
         if (pid < 0) {
             perror("fork");
@@ -35,7 +34,7 @@ public:
 
         if (pid == 0) {
             // Redirect stdout and stderr
-            int dev_null = open("/dev/null", O_WRONLY);
+            const int dev_null = open("/dev/null", O_WRONLY);
             dup2(dev_null, STDOUT_FILENO);
             dup2(dev_null, STDERR_FILENO);
 
@@ -59,11 +58,10 @@ public:
         close(stdin_to_app);
 
         // Kill child if not exited yet
-        pid_t result = waitpid(child_pid, NULL, WNOHANG);
-        if (result == 0) {
+        if (const pid_t result = waitpid(child_pid, nullptr, WNOHANG); result == 0) {
             // Still running
             kill(child_pid, SIGKILL);
-            waitpid(child_pid, NULL, 0);
+            waitpid(child_pid, nullptr, 0);
         }
     }
 };
@@ -71,8 +69,7 @@ public:
 // Test case: Check if switching to bash window and basic command work
 TEST_F(TerminalMultiplexerTest, SwitchAndBash) {
     // Create named pipe to retrieve results
-    int rc = mkfifo(FIFO_NAME, 0666);
-    if (rc < 0) {
+    if (const int rc = mkfifo(FIFO_NAME, 0666); rc < 0) {
         perror("mkfifo");
         exit(EXIT_FAILURE);
     }
@@ -84,23 +81,23 @@ TEST_F(TerminalMultiplexerTest, SwitchAndBash) {
     command += "; exit\n";
     write(stdin_to_app, command.c_str(), command.size());
     
-    // Open named pipe in read non blocking mode
-    int pipefd = open(FIFO_NAME, O_RDONLY | O_NONBLOCK);
+    // Open named pipe in read non-blocking mode
+    const int pipefd = open(FIFO_NAME, O_RDONLY | O_NONBLOCK);
 
     // Try to get results for 1-2 seconds
     char buf[128] = {0};
     int n;
 
-    time_t time_start = time(NULL);
+    const time_t time_start = time(nullptr);
 
-    while (1) {
-        n = read(pipefd, buf, sizeof(buf) - 1);
+    while (true) {
+        n = static_cast<int>(read(pipefd, buf, sizeof(buf) - 1));
         if (n > 0) {
             break;
         }
 
         // Check if time is up
-        if (time(NULL) - time_start >= 2) {
+        if (time(nullptr) - time_start >= 2) {
             break;
         }
     }

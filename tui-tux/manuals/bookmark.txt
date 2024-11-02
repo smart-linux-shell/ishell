@@ -8,6 +8,7 @@ Usage:
   bookmark -r <alias>               Remove the bookmark with the specified alias.
   bookmark --remove <alias>         Remove the bookmark with the specified alias.
   bookmark --help                   Show this help message.
+  <alias>                           Show bookmark data for the specified alias.
 
 Options:
   <index>                           The index of the command in the history to be bookmarked.
@@ -20,4 +21,4 @@ Examples:
   bookmark -r myAlias               Remove the bookmark with the alias 'myAlias'.
   bookmark --remove myAlias         Remove the bookmark with the alias 'myAlias'.
   bookmark --help                   Show this help message.
-
+  myAlias                           Prints the data saved under 'myAlias'.
