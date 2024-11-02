@@ -79,9 +79,15 @@ json AgencyRequestWrapper::send_request_to_agent_server(const std::string& url, 
         {"ssh_user", ssh_user}
     };
 
-    const std::map<std::string, std::string> headers = {
-        {"Content-Type", "application/json"}
+    const char *token_env = getenv("ISHELL_TOKEN");
+
+    std::map<std::string, std::string> headers = {
+        {"Content-Type", "application/json"},
     };
+
+    if (token_env != nullptr) {
+        headers.emplace("Authorization", std::string("token ") + std::string(token_env));
+    }
 
     json response = make_http_request(HttpRequestType::POST, url, {}, request_body, headers);
 
@@ -92,12 +98,14 @@ json AgencyRequestWrapper::send_request_to_agent_server(const std::string& url, 
 std::string AgencyRequestWrapper::ask_agent(const std::string& url, const std::string& user_query, std::vector<std::pair<std::string, std::string>> &session_history) {
     json response = send_request_to_agent_server(url, user_query, session_history);
 
-    if (response.contains("error")) {
-        std::cerr << "Request failed: " << response["error"] << std::endl;
+    const json response_body = response["body"];
+
+    if (response_body.contains("error")) {
+        std::cerr << "Request failed: " << response_body["error"] << std::endl;
         return "";
     }
 
-    if (json response_body = response["body"]; response_body.contains("content")) {
+    if (response_body.contains("content")) {
         return response_body["content"].get<std::string>();
     }
 
