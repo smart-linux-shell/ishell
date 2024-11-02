@@ -44,7 +44,7 @@ struct TerminalChar {
     std::string sequence;
 };
 
-TerminalChar escape(std::string &seq);
+TerminalChar escape(const std::string &seq);
 int read_and_escape(int fd, std::vector<TerminalChar> &vec);
 
 #endif

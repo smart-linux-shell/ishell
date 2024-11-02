@@ -10,13 +10,13 @@
 using json = nlohmann::json;
 
 // Helper function to handle the response body
-static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* s) {
-    s->append((char*)contents, size * nmemb);
+static size_t WriteCallback(void* contents, const size_t size, const size_t nmemb, std::string* s) {
+    s->append(static_cast<char *>(contents), size * nmemb);
     return size * nmemb;
 }
 
 // Helper function to capture headers from the response
-static size_t HeaderCallback(char* buffer, size_t size, size_t nitems, std::map<std::string, std::string>* headers) {
+static size_t HeaderCallback(const char* buffer, const size_t size, const size_t nitems, std::map<std::string, std::string>* headers) {
     std::string header(buffer, size * nitems);
     size_t separator = header.find(':');
     if (separator != std::string::npos) {
@@ -30,8 +30,8 @@ static size_t HeaderCallback(char* buffer, size_t size, size_t nitems, std::map<
 // Function to convert query parameters to a URL-encoded string
 std::string HttpsClient::build_query_string(const std::map<std::string, std::string>& query_params) {
     std::stringstream ss;
-    for (const auto& param : query_params) {
-        ss << param.first << "=" << param.second << "&";
+    for (const auto&[fst, snd] : query_params) {
+        ss << fst << "=" << snd << "&";
     }
     std::string query_string = ss.str();
     if (!query_string.empty()) {
@@ -100,14 +100,13 @@ void HttpsClient::set_response_callbacks(CURL* curl, std::string& readBuffer, st
 
 // Function to perform the CURL request and handle the response
 json HttpsClient::perform_request(CURL* curl) {
-    CURLcode res;
     long response_code = 0;
     std::string readBuffer;
     std::map<std::string, std::string> response_headers;
 
     set_response_callbacks(curl, readBuffer, response_headers);
 
-    res = curl_easy_perform(curl);
+    const CURLcode res = curl_easy_perform(curl);
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
 
     json response = {
@@ -131,10 +130,10 @@ json HttpsClient::perform_request(CURL* curl) {
 }
 
 // Function to make an HTTP request
-json HttpsClient::make_http_request(HttpRequestType request_type, const std::string& url,
-                       const std::map<std::string, std::string>& query_params = {},
-                       const json& body = nullptr,
-                       const std::map<std::string, std::string>& headers = {}) {
+json HttpsClient::make_http_request(const HttpRequestType request_type, const std::string& url,
+                                    const std::map<std::string, std::string>& query_params = {},
+                                    const json& body = nullptr,
+                                    const std::map<std::string, std::string>& headers = {}) {
 
     CURL* curl = curl_easy_init();
     if (!curl) {

@@ -33,15 +33,13 @@ The **AI Powered Linux Shell** splits terminal into two sections:
 - **Bash (bottom section):** A regular bash shell where you can run your standard Linux commands, as well as interactive applications, such as `nano` and `top`. 
 - **Agent (top section):** An AI-powered agent that helps with Linux queries, troubleshooting, and command management.  The agent uses a large language model (LLM) to answer Linux-related questions, keeping context within a session, with the ability to bookmark frequently used queries.
 
+_**Important information**_: In order to use the inspector agent, a SSH server must be setup on the user's machine, and a provided public key must be installed. Inspector agent can be found [here](https://github.com/smart-linux-shell/agency).
+
 ## Installation
 
 ### Option 1: Installing via `apt` 
 
 **[WIP - need to update address/deb to the correct URL]**
-
-A GPG key is required to sign the .deb package:
-- _public key_ should be hosted in: `pkg/KEY.gpg`
-- _private key_ should be pasted as a secret in: `secrets.DEB_GPG_KEY`
 
 Add repository to `apt`:
 ```bash
@@ -65,17 +63,6 @@ git clone git@github.com:smart-linux-shell/ishell.git
 Compile and run ishell:
 ```bash
 cd ishell
-./run.sh
-```
-
-### Running the Server
-
-_**Important information**_: In order to use the inspector agent, a SSH server must be setup on the user's machine, and a provided public key must be installed. Inspector agent can be found [here](https://github.com/smart-linux-shell/agency).
-
-Clone the source code and run server:
-```bash
-git@github.com:smart-linux-shell/agency.git
-cd agency
 ./run.sh
 ```
 
@@ -108,6 +95,7 @@ While focused on the agent window, special commands can be executed in System Mo
 - `bookmark -l` or `bookmark list`- List all saved bookmarks.
 - `bookmark -r <alias>` or `bookmark --remove <alias>` - Remove the bookmark with the specified alias.
 - `bookmark --help`  - Show help message.
+- `switch <agent_name>` - Switch to another agent.
 - `<alias>` - Executes query with specified alias.
 
 ### Demo

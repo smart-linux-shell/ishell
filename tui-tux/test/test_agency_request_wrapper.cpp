@@ -87,7 +87,7 @@ TEST_F(AgencyRequestWrapperTest, CorrectRequestData) {
 
 // Test case: Handles the case where one or more fields are empty.
 TEST_F(AgencyRequestWrapperTest, EmptyFields) {
-    EXPECT_CALL(mock_agency_request_wrapper2, getenv(StrEq("SSH_CLIENT")))
+    EXPECT_CALL(mock_agency_request_wrapper2, getenv(StrEq("SSH_IP")))
         .WillOnce(Return(nullptr));
     
     EXPECT_CALL(mock_agency_request_wrapper2, getenv(StrEq("SSH_PORT")))

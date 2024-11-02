@@ -7,18 +7,18 @@
 
 using namespace testing;
 
-class MockHttpsClient1 : public HttpsClient {
+class MockHttpsClient1 final : public HttpsClient {
 public:
     MOCK_METHOD(CURL *, curl_easy_init, (), (override));
 };
 
-class MockHttpsClient2 : public HttpsClient {
+class MockHttpsClient2 final : public HttpsClient {
 public:
     MOCK_METHOD(void, set_response_callbacks, (CURL* curl, std::string& readBuffer, (std::map<std::string, std::string>&) response_headers), (override));
     MOCK_METHOD(CURLcode, curl_easy_perform, (CURL *curl), (override));
 };
 
-class MockHttpsClient3 : public HttpsClient {
+class MockHttpsClient3 final : public HttpsClient {
 public:
     MOCK_METHOD(CURLcode, curl_easy_perform, (CURL *curl), (override));
 };
@@ -46,7 +46,7 @@ TEST_F(HttpsClientTest, GetNoQueryParams) {
 
 // Test case: Successfully makes a POST request with a JSON body and headers.
 TEST_F(HttpsClientTest, PostJson) {
-    json request = {
+    const json request = {
         {"email", "eve.holt@reqres.in"},
         {"password", "pistol"}
     };
@@ -58,7 +58,7 @@ TEST_F(HttpsClientTest, PostJson) {
 
 // Test case: Successfully makes a PUT request with a JSON body.
 TEST_F(HttpsClientTest, PutJson) {
-    json request = {
+    const json request = {
         {"name", "morpheus"},
         {"job", "zion resident"}
     };
@@ -80,7 +80,7 @@ TEST_F(HttpsClientTest, InitFail) {
     EXPECT_CALL(mock_https_client1, curl_easy_init)
         .WillOnce(Return(nullptr));
 
-    json response = mock_https_client1.make_http_request(HttpRequestType::GET, "https://example.com", {}, {}, {});
+    const json response = mock_https_client1.make_http_request(HttpRequestType::GET, "https://example.com", {}, {}, {});
 
     EXPECT_TRUE(response.contains("error"));
 };
@@ -123,7 +123,7 @@ TEST_F(HttpsClientTest, HandleNonJson) {
 TEST_F(HttpsClientTest, HandleError) {
     EXPECT_CALL(mock_https_client3, curl_easy_perform(_))
         .WillOnce(Invoke([](CURL *curl) -> CURLcode {
-            return (CURLcode) CURLE_AGAIN;
+            return CURLE_AGAIN;
         }));
 
     // Call
@@ -135,7 +135,7 @@ TEST_F(HttpsClientTest, HandleError) {
 
 // Test case: Correctly retrieves response headers and status code.
 TEST_F(HttpsClientTest, HeadersAndStatusCode1) {
-    std::string url = "https://reqres.in/api/users?page=2";
+    const std::string url = "https://reqres.in/api/users?page=2";
     CURL *curl = curl_easy_init();
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 
@@ -146,7 +146,7 @@ TEST_F(HttpsClientTest, HeadersAndStatusCode1) {
 }
 
 TEST_F(HttpsClientTest, HeadersAndStatusCode2) {
-    std::string url = "https://reqres.in/api/users/23";
+    const std::string url = "https://reqres.in/api/users/23";
     CURL *curl = curl_easy_init();
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 

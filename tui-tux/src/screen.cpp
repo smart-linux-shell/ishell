@@ -3,13 +3,13 @@
 #include <screen.hpp>
 #include <utils.hpp>
 
-Screen::Screen() {}
+Screen::Screen() = default;
 
-Screen::Screen(int lines, int cols, int pty_master, int pid) {
+Screen::Screen(const int lines, const int cols, const int pty_master, const int pid) {
     init(lines, cols, pty_master, pid);
 }
 
-Screen::Screen(int lines, int cols, Screen &old_screen) {
+Screen::Screen(const int lines, const int cols, Screen &old_screen) {
     init(lines, cols, old_screen);
 }
 
@@ -21,16 +21,14 @@ int Screen::get_n_cols() const {
     return n_cols;
 }
 
-void Screen::handle_char(TerminalChar &tch) {
+void Screen::handle_char(const TerminalChar &tch) {
     // CR
     if (tch.ch == '\r') {
         cursor_return();
     } else if (tch.ch == '\n') {
         newline();
-    } else if (tch.ch == KEY_BEL) {
-        // BEL (ignore)
-    } else if (tch.ch == KEY_SI) {
-        // Disable alt charset (ignore)
+    } else if (tch.ch == KEY_BEL || tch.ch == KEY_SI) {
+        // ignore BEL and alt charset
     } else if (tch.ch == KEY_BS) {
         // BKSP
         cursor_back();
@@ -105,7 +103,7 @@ void Screen::handle_char(TerminalChar &tch) {
     }
 }
 
-void Screen::write_char(chtype ch) {
+void Screen::write_char(const chtype ch) {
     bool inserting = false;
 
     int y = getcury(pad);
@@ -173,21 +171,16 @@ void Screen::cursor_forward() {
 }
 
 void Screen::cursor_up() {
-    int rc = move_cursor(getcury(pad) - 1, getcurx(pad));
+    move_cursor(getcury(pad) - 1, getcurx(pad));
 
-    if (rc != ERR) {
-        while (getcury(pad) < pad_start) {
-            scroll_up();
-        }
+    while (getcury(pad) < pad_start) {
+        scroll_up();
     }
 }
 
 int Screen::move_cursor(int y, int x) {
-    int rc = wmove(pad, y, x);
-
-    if (rc != ERR) {
-        cursor_wrapped = false;
-    }
+    const int rc = wmove(pad, y, x);
+    cursor_wrapped = false;
 
     return rc;
 }
@@ -200,16 +193,16 @@ void Screen::clear() {
     pad_start = 0;
 }
 
-void Screen::erase(int del_cnt) {    
+void Screen::erase(const int del_cnt) {
     for (int i = 0; i < del_cnt; i++) {
         wdelch(pad);
 
         // Set user placed false at the end of the chain
-        int y = getcury(pad);
-        int x = getcurx(pad);
+        const int y = getcury(pad);
+        const int x = getcurx(pad);
         bool found = false;
 
-        for (int j = x; j < n_cols - 1 && found; j++) {
+        for (int j = x; j < n_cols - 1 && !found; j++) {
             if (!user_placed[y][j + 1]) {
                 found = true;
                 user_placed[y][j] = false;
@@ -242,7 +235,7 @@ void Screen::cursor_down() {
 }
 
 // Translates coords passed in escape coords to pad coords.
-int Screen::translate_given_x(int x) {
+int Screen::translate_given_x(const int x) const {
     if (x < 1) {
         return 0;
     }
@@ -254,7 +247,7 @@ int Screen::translate_given_x(int x) {
     return (x - 1);
 }
 
-int Screen::translate_given_y(int y) {
+int Screen::translate_given_y(const int y) const {
     if (y < 1) {
         return pad_start;
     }
@@ -266,7 +259,7 @@ int Screen::translate_given_y(int y) {
     return pad_start + y - 1;
 }
 
-void Screen::translate_given_coords(int y, int x, int &new_y, int &new_x) {
+void Screen::translate_given_coords(int y, int x, int &new_y, int &new_x) const {
     new_x = translate_given_x(x);
     new_y = translate_given_y(y);
 }
@@ -274,8 +267,8 @@ void Screen::translate_given_coords(int y, int x, int &new_y, int &new_x) {
 void Screen::scroll_up() {
     if (pad_start > 0) {
         pad_start--;
-        int y = getcury(pad);
-        int x = getcurx(pad);
+        const int y = getcury(pad);
+        const int x = getcurx(pad);
 
         wmove(pad, pad_start, 0);
         erase_to_eol();
@@ -290,8 +283,7 @@ void Screen::scroll_down() {
 }
 
 void Screen::newline() {
-    int y = getcury(pad);
-    if (line_info[y] == LINE_INFO_UNTOUCHED) {
+    if (const int y = getcury(pad); line_info[y] == LINE_INFO_UNTOUCHED) {
         line_info[y] = LINE_INFO_UNWRAPPED;
     }
 
@@ -315,7 +307,7 @@ int Screen::get_pad_height() const {
     return pad_lines;
 }
 
-void Screen::delete_wins() {
+void Screen::delete_wins() const {
     delwin(pad);
 }
 
@@ -324,7 +316,7 @@ void Screen::insert_next(int num) {
     pushing_right = num;
 }
 
-void Screen::refresh_screen() {
+void Screen::refresh_screen() const {
     int start = pad_start;
 
     if (manual_scrolling_start != -1) {
@@ -425,7 +417,7 @@ void Screen::init(int new_lines, int new_cols, Screen &old_screen) {
     }
 }
 
-bool Screen::is_in_manual_scroll() {
+bool Screen::is_in_manual_scroll() const {
     return (manual_scrolling_start != -1);
 }
 
@@ -460,7 +452,7 @@ int Screen::waddch(WINDOW *window, const chtype ch) {
     // Expand if out of bounds
     int rc;
 
-    while (1) {
+    while (true) {
         rc = ::waddch(window, ch);
         if (rc != ERR) {
             break;
@@ -481,7 +473,7 @@ int Screen::winsch(WINDOW *window, const chtype ch) {
     // Expand if out of bounds
     int rc;
 
-    while (1) {
+    while (true) {
         rc = ::winsch(window, ch);
         if (rc != ERR) {
             break;
@@ -496,7 +488,7 @@ int Screen::wmove(WINDOW *window, int y, int x) {
     // Expand if out of bounds
     int rc;
 
-    while (1) {
+    while (true) {
         rc = ::wmove(window, y, x);
         if (rc != ERR) {
             break;
