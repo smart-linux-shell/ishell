@@ -89,11 +89,15 @@ jobs:
           gpg --default-key "ishell" -abs -o - Release > Release.gpg;
           gpg --default-key "ishell" --clearsign -o - Release > InRelease 
 
-      - name: Upload deb directory
+      - name: Upload pkg directory
         uses: actions/upload-artifact@v3
         with:
-          name: deb-packages
-          path: pkg/deb/
+          name: pkg-artifacts
+          path: pkg/
+
+      - name: info
+        run: |
+          tree 
 
   push_to_registry:
     needs: build_deb_snap
@@ -105,8 +109,8 @@ jobs:
       - name: Download deb artifacts
         uses: actions/download-artifact@v3
         with:
-          name: deb-packages
-          path: pkg/deb
+          name: pkg-artifacts
+          path: pkg/
 
       - name: info
         run: |
