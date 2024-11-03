@@ -1,4 +1,5 @@
 #!/bin/bash
+# to be refactored
 
 PROJECT_DIR="tui-tux"
 DEPENDENCIES=(
