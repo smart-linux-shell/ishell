@@ -1,8 +1,9 @@
 # AI Powered Linux Shell
 
+## status
 [![Build and push docker image to Docker Hub](https://github.com/smart-linux-shell/ishell/actions/workflows/on-push.yml/badge.svg)](https://github.com/smart-linux-shell/ishell/actions/workflows/on-push.yml)
 
-This project is a dual-pane Linux terminal designed to enhance user experience by integrating an AI-powered agent in one pane and a traditional bash shell in the other. The agent helps users with different levels of experience, by answering queries, running Linux commands, and managing bookmarks for frequently used commands, making it easier to navigate and troubleshoot Linux systems.
+This project is a dual-pane Linux terminal designed to enhance the user experience by integrating an AI-powered agent in one pane and a traditional bash shell in the other. The agent helps users with different levels of experience, by answering queries, running Linux commands, and managing bookmarks for frequently used commands, making it easier to navigate and troubleshoot Linux systems.
 
 ### Contributors
 
