@@ -6,6 +6,7 @@ COPY ./app /app/
 
 RUN mkdir -p /deb
 RUN stat /deb
+RUN ls -la /
 COPY ./deb /deb/
 
 
