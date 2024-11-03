@@ -99,8 +99,8 @@ jobs:
     needs: build_deb_snap
     runs-on: ubuntu-latest
     steps:
-    #   - name: Check out repo
-    #     uses: actions/checkout@v4
+      - name: Check out repo
+        uses: actions/checkout@v4
         
       - name: Download deb artifacts
         uses: actions/download-artifact@v3
