@@ -5,15 +5,12 @@ WORKDIR /app
 RUN apt-get update
 
 # Create directory for deb packages
-RUN mkdir -p /app/pkg/deb
+RUN mkdir -p /app/static/deb
 
 # Copy the deb package files first
-COPY ./pkg/deb /app/pkg/deb/
+COPY ./pkg/deb /app/static/deb/
 
 # Add the GPG key and configure the repository
-RUN apt-get install -y gnupg
-COPY ./pkg/deb/KEY.gpg /etc/apt/trusted.gpg.d/ishell.gpg
-COPY ./pkg/deb/sources.list /etc/apt/sources.list.d/ishell.list
 
 # Update apt and install the ishell package
 RUN apt-get update && \
