@@ -4,8 +4,8 @@ WORKDIR /app
 
 COPY ./app /app/
 
-RUN mkdir -p /data
-COPY ./pkg /data
+RUN mkdir -p /deb
+COPY ./pkg /deb/
 
 RUN apt-get update
 

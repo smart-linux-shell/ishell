@@ -21,7 +21,7 @@ def index():
 @app.route('/deb/<path:filename>')
 def serve_deb_repo(filename):
     try:
-        filepath = os.path.join('/data', filename)
+        filepath = os.path.join('/deb', filename)
         if os.path.exists(filepath):
             log.info(f"Serving file {filepath}.")
             # Get the directory path and actual filename
