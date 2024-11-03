@@ -1,4 +1,4 @@
-name: Build .deb and snap
+name: Build_package
 'on':
   push:
     branches:
@@ -90,3 +90,9 @@ jobs:
           apt-ftparchive release . > Release;
           gpg --default-key "ishell" -abs -o - Release > Release.gpg;
           gpg --default-key "ishell" --clearsign -o - Release > InRelease 
+
+      - name: Upload deb directory
+        uses: actions/upload-artifact@v3
+        with:
+          name: deb-packages
+          path: pkg/deb/
