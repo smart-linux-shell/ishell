@@ -4,11 +4,6 @@ WORKDIR /app
 
 RUN apt-get update
 
-# Update apt and install the ishell package
-RUN apt-get update && \
-    apt-get install -y ishell && \
-    apt-get clean
-
 # Continue with the rest of the setup
 COPY ./app /app/
 
