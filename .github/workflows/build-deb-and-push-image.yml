@@ -114,7 +114,7 @@ jobs:
 
       - name: info
         run: |
-            ls -la ./pkg
+            tree
 
       - name: Push docker image
         uses: smart-linux-shell/workflows@main
