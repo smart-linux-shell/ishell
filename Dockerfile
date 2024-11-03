@@ -8,10 +8,9 @@ RUN apt-get update
 COPY ./app /app/
 
 RUN mkdir -p /data
-RUN mkdir -p /data1
+RUN mkdir -p /data
 
-COPY ./pkg /data1
-COPY ./pkg_static /data
+COPY ./pkg /data
 
 
 RUN pip3 install --upgrade pip
