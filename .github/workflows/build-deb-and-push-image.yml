@@ -1,9 +1,12 @@
-name: Build .deb and snap
+name: Build and Push
 'on':
   push:
     branches:
       - main
       - integration
+      - stage
+      - cicd-workflow
+
 jobs:
   build_deb_snap:
     runs-on: ubuntu-latest
@@ -58,11 +61,6 @@ jobs:
       - name: Build deb
         working-directory: ./tui-tux
         run: dpkg --build ishell_${VERSION}_amd64/
-
-      # - name: Create snap file
-      #   uses: snapcore/action-build@v1
-      #   with:
-      #     path: ./tui-tux
           
       - name: Import Debian repository GPG key
         run: echo "${{ secrets.DEB_GPG_KEY }}" | gpg --import
@@ -91,15 +89,33 @@ jobs:
           gpg --default-key "ishell" -abs -o - Release > Release.gpg;
           gpg --default-key "ishell" --clearsign -o - Release > InRelease 
 
-      - name: Upload Debian package artifacts
-        uses: actions/upload-artifact@v4
+      - name: Upload deb directory
+        uses: actions/upload-artifact@v3
         with:
-          name: debian-packages
-          path: |
-            pkg/deb/ishell_*_amd64.deb
-            pkg/deb/Packages
-            pkg/deb/Packages.gz
-            pkg/deb/Release
-            pkg/deb/Release.gpg
-            pkg/deb/InRelease
-            pkg/deb/KEY.gpg
+          name: deb-packages
+          path: pkg/deb/
+
+  push_to_registry:
+    needs: build_deb_snap
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        
+      - name: Download deb artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: deb-packages
+          path: pkg/deb
+
+      - name: info
+        run: |
+            tree 
+
+      - name: Push docker image
+        uses: smart-linux-shell/workflows@main
+        with:
+          docker-username: ${{ secrets.DOCKER_USERNAME }}
+          docker-password: ${{ secrets.DOCKER_PASSWORD }}
+          cicd-github-token: ${{ secrets.CICD_GITHUB_TOKEN }}
+
