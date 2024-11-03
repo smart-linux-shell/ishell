@@ -7,11 +7,11 @@ RUN apt-get update
 # Continue with the rest of the setup
 COPY ./app /app/
 
-RUN mkdir -p /data
+RUN mkdir -p /app/static/deb
 
 
 # Copy the deb package files first
-COPY ./pkg /data/
+COPY ./pkg /app/static/deb/
 
 
 RUN pip3 install --upgrade pip
