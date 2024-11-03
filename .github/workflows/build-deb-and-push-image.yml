@@ -109,8 +109,8 @@ jobs:
       - name: Download deb artifacts
         uses: actions/download-artifact@v3
         with:
-          name: deb-packages
-          path: pkg/deb
+          name: pkg-artifacts
+          path: pkg_static/
 
       - name: info
         run: |
