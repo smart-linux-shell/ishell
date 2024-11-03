@@ -2,7 +2,7 @@ name: Build and push docker image to Docker Hub
 
 on:
   workflow_run:
-    workflows: [Build_package]  
+    workflows: ["Build_package"]  
     types:
       - completed
     branches:
