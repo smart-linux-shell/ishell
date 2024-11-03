@@ -1,4 +1,4 @@
-from flask import Flask, Response
+from flask import Flask, send_from_directory
 import os
 from logger import log
 
@@ -21,20 +21,19 @@ def index():
 @app.route('/deb/<path:filename>')
 def serve_deb_repo(filename):
     try:
-        path = os.path.join(app.static_folder, 'deb', filename)
-        
-        def generate():
-            with open(path, 'rb') as f:
-                while chunk := f.read(8192):
-                    yield chunk
-                    
-        return Response(
-            generate(),
-            mimetype=mimetypes.guess_type(filename)[0],
-            direct_passthrough=True
-        )
-    except FileNotFoundError:
-        abort(404)
+        filepath = os.path.join('/data', filename)
+        if os.path.exists(filepath):
+            log.info(f"Serving file {filepath}.")
+            # Get the directory path and actual filename
+            directory = os.path.dirname(os.path.join('/data', filename))
+            basename = os.path.basename(filename)
+            return send_from_directory(directory, basename)
+        else:
+            log.error(f"File {filepath} does not exist.")
+            abort(404)
+    except Exception as e:
+        log.error(f"Error serving file: {str(e)}")
+        return "Invalid"
 
 if __name__ == '__main__':
     log.info('Service started, version: %s', version)
