@@ -6,6 +6,7 @@ COPY ./app /app/
 
 RUN mkdir -p /deb
 COPY ./pkg/*/ /deb/
+RUN ls -la /deb/
 
 RUN apt-get update
 
