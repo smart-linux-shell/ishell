@@ -4,14 +4,6 @@ WORKDIR /app
 
 RUN apt-get update
 
-# Create directory for deb packages
-RUN mkdir -p /app/static/deb
-
-# Copy the deb package files first
-COPY ./pkg/deb /app/static/deb/
-
-# Add the GPG key and configure the repository
-
 # Update apt and install the ishell package
 RUN apt-get update && \
     apt-get install -y ishell && \
@@ -19,7 +11,13 @@ RUN apt-get update && \
 
 # Continue with the rest of the setup
 COPY ./app /app/
-RUN mkdir -p /data
+
+RUN mkdir -p /data/deb
+
+
+# Copy the deb package files first
+COPY ./pkg/deb /data/deb/
+
 
 RUN pip3 install --upgrade pip
 
