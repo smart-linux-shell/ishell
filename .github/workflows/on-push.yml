@@ -6,6 +6,7 @@ on:
         - 'main'
         - 'stage'
         - 'cicd-workflow'
+        - 'integration'
 jobs:
   push_to_registry:
     runs-on: ubuntu-latest
