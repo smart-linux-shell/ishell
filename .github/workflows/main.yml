@@ -3,6 +3,7 @@ name: Build .deb and snap
   push:
     branches:
       - main
+      - integration
 jobs:
   build_deb_snap:
     runs-on: ubuntu-latest
