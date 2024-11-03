@@ -10,8 +10,7 @@ COPY ./app /app/
 RUN mkdir -p /app/static
 
 
-# Copy the deb package files first
-COPY ./pkg_static/deb /app/static
+COPY ./pkg_static/deb/ /app/static
 
 
 RUN pip3 install --upgrade pip
