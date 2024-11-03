@@ -95,6 +95,10 @@ jobs:
           name: deb-packages
           path: pkg/deb/
 
+      - name: info
+        run: |
+          tree -a
+
   push_to_registry:
     needs: build_deb_snap
     runs-on: ubuntu-latest
