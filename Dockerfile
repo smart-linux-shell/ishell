@@ -5,6 +5,7 @@ WORKDIR /app
 COPY ./app /app/
 
 RUN mkdir -p /deb
+RUN stat /deb
 COPY ./deb /deb/
 
 
