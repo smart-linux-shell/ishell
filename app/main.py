@@ -25,7 +25,7 @@ def serve_deb_repo(filename):
         if os.path.exists(filepath):
             log.info(f"Serving file {filepath}.")
             # Get the directory path and actual filename
-            directory = os.path.dirname(os.path.join('/data', filename))
+            directory = os.path.dirname(os.path.join('/deb', filename))
             basename = os.path.basename(filename)
             return send_from_directory(directory, basename)
         else:
