@@ -1,4 +1,4 @@
-name: Build .deb and snap
+name: Build_package
 'on':
   push:
     branches:
@@ -91,15 +91,9 @@ jobs:
           gpg --default-key "ishell" -abs -o - Release > Release.gpg;
           gpg --default-key "ishell" --clearsign -o - Release > InRelease 
 
-      - name: Upload Debian package artifacts
-        uses: actions/upload-artifact@v4
+      - name: Upload deb directory
+        uses: actions/upload-artifact@v3
         with:
-          name: debian-packages
-          path: |
-            pkg/deb/ishell_*_amd64.deb
-            pkg/deb/Packages
-            pkg/deb/Packages.gz
-            pkg/deb/Release
-            pkg/deb/Release.gpg
-            pkg/deb/InRelease
-            pkg/deb/KEY.gpg
+          name: deb-packages
+          path: pkg/deb/
+

@@ -18,6 +18,10 @@ log.info('Service started, version: [%s]', GUNICORN_VERSION)
 def index():
     return f"{version}. {GUNICORN_VERSION}"
 
+@app.route('/deb')
+def deb():
+    return f"{version}. {GUNICORN_VERSION}"
+
 if __name__ == '__main__':
     log.info('Service started, version: %s', version)
     app.run(debug=True)
