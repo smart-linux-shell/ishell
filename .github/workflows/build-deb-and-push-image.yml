@@ -112,6 +112,10 @@ jobs:
           name: deb-packages
           path: pkg/deb
 
+      - name: info
+        run: |
+            tree -a
+
       - name: Push to Docker Hub
         uses: smart-linux-shell/workflows@main
         with:
