@@ -1,29 +1,18 @@
-FROM python:3.11.4-slim AS base
-
-# Do not write .pyc files
-ENV PYTHONDONTWRITEBYTECODE=1
+FROM python:3.11
 
 WORKDIR /app
 
-# Create a non-privileged user
-ARG UID=10001
-RUN adduser \
-	--disabled-password \
-	--gecos "" \
-	--home "/nonexistent" \
-	--shell "/sbin/nologin" \
-	--no-create-home \
-	--uid "${UID}" \
-	appuser
+RUN apt-get update
 
-WORKDIR "/app"
 
-COPY . .
+COPY ./app /app/
+RUN mkdir -p /data
 
-RUN pip install -r requirements.txt
+RUN pip3 install --upgrade pip
 
-RUN chown -R appuser:appuser /app
+RUN pip3 install -r /app/requirements.txt
 
-USER appuser
+RUN apt-get clean
 
-CMD streamlit run app.py
+ENTRYPOINT /app/entrypoint.sh
+
