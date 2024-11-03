@@ -7,9 +7,12 @@ RUN apt-get update
 # Continue with the rest of the setup
 COPY ./app /app/
 
-RUN mkdir -p /app/static
+RUN mkdir -p /data
+RUN mkdir -p /data1
 
-COPY ./pkg_static /app/static/
+COPY ./pkg /data1
+COPY ./pkg_static /data
+
 
 RUN pip3 install --upgrade pip
 
