@@ -117,4 +117,6 @@ jobs:
         with:
           docker-username: ${{ secrets.DOCKER_USERNAME }}
           docker-password: ${{ secrets.DOCKER_PASSWORD }}
+          tocken:   ${{ secrets.DOCKER_PASSWORD }}
           cicd-github-token: ${{ secrets.CICD_GITHUB_TOKEN }}
+
