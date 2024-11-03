@@ -9,7 +9,6 @@ RUN mkdir -p /deb/deb
 
 
 COPY ./pkg/*/ /deb/
-ls -la ./pkg/deb/InRelease
 COPY ./pkg/deb/InRelease /deb/deb/
 
 RUN ls -la /deb/
