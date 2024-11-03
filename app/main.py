@@ -21,9 +21,6 @@ def index():
 @app.route('/deb/<path:filename>')
 def serve_deb_repo(filename):
     try:
-        if not is_allowed_file(filename):
-            abort(403)
-            
         path = os.path.join(app.static_folder, 'deb', filename)
         
         def generate():
