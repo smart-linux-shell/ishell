@@ -1,4 +1,5 @@
 #include <command_manager.hpp>
+#include <session_tracker.hpp>
 #include <fstream>
 #include <utils.hpp>
 #include <iostream>
@@ -11,6 +12,8 @@ CommandManager::CommandManager(BookmarkManager *bookmark_manager) {
 }
 
 void CommandManager::run_command(std::string &command) {
+    SessionTracker::get().logEvent("system_command", command);
+
     if (std::vector<std::string> words = split(command, ' ', true); !words.empty()) {
         const std::vector args(words.begin() + 1, words.end());
         for (auto &[command_name, command_function] : command_map) {
@@ -27,7 +30,10 @@ void CommandManager::run_command(std::string &command) {
             return;
         }
 
-        std::cerr << "Error: Command not found!\n";
+        std::string error_msg = "Error: Command not found!";
+        std::cerr << error_msg << std::endl;
+        SessionTracker::get().logEvent("system_message", error_msg);
+
     }
 }
 

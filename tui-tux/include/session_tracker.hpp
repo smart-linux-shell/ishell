@@ -1,34 +1,34 @@
 #ifndef SESSION_TRACKER_HPP
 #define SESSION_TRACKER_HPP
 
-#include <string>
 #include <fstream>
-#include <ctime>
-#include <sstream>
-#include <iomanip>
-#include "../nlohmann/json.hpp"
+#include <string>
+#include <../nlohmann/json.hpp>
 
 class SessionTracker {
 public:
-    static SessionTracker& getInstance();
+    static SessionTracker& get();
 
     void startSession();
     void endSession();
 
-    void logUserRequest(const std::string& query);
-    void logAgentResponse(const std::string& response);
-    void logUserCommand(const std::string& command);
-    void logCommandResult(int exit_status, const std::string& output);
+    void logEvent(const std::string& event_type, const std::string& data);
 
 private:
     SessionTracker();
     ~SessionTracker();
 
+    SessionTracker(const SessionTracker&) = delete;
+    SessionTracker& operator=(const SessionTracker&) = delete;
+
     std::string generateSessionId();
+    void openLogFile();
 
     nlohmann::json sessionData;
     std::ofstream logFile;
 
-    bool lastInteractionOpen;
+    std::string sessionId;
+    std::string username;
 };
-#endif //SESSION_TRACKER_HPP
+
+#endif

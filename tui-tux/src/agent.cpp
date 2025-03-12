@@ -3,14 +3,16 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
+
 #include <readline/readline.h>
 #include <readline/history.h>
 
 #include <agency_manager.hpp>
 #include <bookmark_manager.hpp>
 #include <agency_request_wrapper.hpp>
+#include <session_tracker.hpp>
+
 #include "command_manager.hpp"
-#include "session_tracker.hpp"
 
 #define MODE_SYSTEM 0
 #define MODE_AGENT 1
@@ -44,7 +46,6 @@ void load_history(const std::vector<std::string>& history_storage) {
 void line_handler(char *line) {
     if (!line) {
         running = false;
-        SessionTracker::getInstance().endSession();
         return;
     }
 
@@ -52,18 +53,14 @@ void line_handler(char *line) {
     add_history(line);
 
     if (prompt_mode == MODE_AGENT) {
-        SessionTracker::getInstance().logUserRequest(input_str);
-
+        SessionTracker::get().logEvent("user_query", input_str);
         // New query to agent
         const std::string agency = manager.get_agency_url();
         const std::string result = manager.execute_query(agency + "/" + bookmark_manager.agency_manager->get_agent_name(), input_str);
-
-        SessionTracker::getInstance().logAgentResponse(result);
-
         std::cout << result << "\n";
-    } else if (prompt_mode == MODE_SYSTEM) {
-        SessionTracker::getInstance().logUserCommand(input_str);
 
+        SessionTracker::get().logEvent("agent_response", result);
+    } else if (prompt_mode == MODE_SYSTEM) {
         command_manager.run_command(input_str);
     }
 
@@ -72,8 +69,8 @@ void line_handler(char *line) {
 
 void agent() {
     // Enable history storage
-    SessionTracker::getInstance().startSession();
     history_storage = std::vector(2, std::vector<std::string>());
+    SessionTracker::get().startSession();
 
     // Disable TAB-completion. This was impossible to find
     rl_inhibit_completion = 1;
@@ -115,5 +112,5 @@ void agent() {
     }
 
     bookmark_manager.save_bookmarks("local/bookmarks.json");
-    SessionTracker::getInstance().endSession();
+    SessionTracker::get().endSession();
 }
