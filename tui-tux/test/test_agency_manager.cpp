@@ -94,7 +94,7 @@ TEST_F(AgencyManagerTest, ExecuteQuery_AskAgentFails) {
     const std::string url = agency_manager.get_agency_url();
     EXPECT_CALL(mock_request_wrapper, ask_agent("http://localhost:5000/assistant", "test query", agency_manager.session_history))
         .WillOnce(::testing::Return(""));
-    // act
+    // act.
     const std::string result = agency_manager.execute_query(url + "/assistant", "test query");
     // assert
     EXPECT_EQ(result, "");
