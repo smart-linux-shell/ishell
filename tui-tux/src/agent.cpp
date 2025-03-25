@@ -53,13 +53,12 @@ void line_handler(char *line) {
     add_history(line);
 
     if (prompt_mode == MODE_AGENT) {
-        SessionTracker::get().logEvent("user_query", input_str);
         // New query to agent
         const std::string agency = manager.get_agency_url();
         const std::string result = manager.execute_query(agency + "/" + bookmark_manager.agency_manager->get_agent_name(), input_str);
         std::cout << result << "\n";
 
-        SessionTracker::get().logEvent("agent_response", result);
+        SessionTracker::get().logAgentInteraction(input_str, result);
     } else if (prompt_mode == MODE_SYSTEM) {
         command_manager.run_command(input_str);
     }

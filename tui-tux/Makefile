@@ -7,7 +7,7 @@ SOURCES := $(NO_MAIN_SOURCES) main.cpp
 
 TEST_SOURCES := test_bookmark_manager.cpp test_agency_request_wrapper.cpp test_https_client.cpp test_escape.cpp test_agency_manager.cpp test_terminal_multiplexer.cpp test_command_manager.cpp
 FLAGS := -Wall
-LIBS := -lncurses -lreadline -lcurl
+LIBS := -lncurses -lreadline -lcurl -lsqlite3
 TEST_EXTRA_LIBS := -lgtest -lgmock -L/usr/local/lib -lgtest_main -lpthread
 
 NO_MAIN_OBJECTS := $(patsubst %.cpp,%.o,$(patsubst %, bin/%, $(NO_MAIN_SOURCES)))

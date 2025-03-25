@@ -8,6 +8,7 @@
 #include <cstring>
 #include <cerrno>
 #include <string>
+#include <stdio.h>
 
 #include <screen.hpp>
 #include <utils.hpp>
@@ -477,6 +478,7 @@ void TerminalMultiplexer::run_terminal() {
 
 int TerminalMultiplexer::handle_screen_output(Screen &screen, const int fd) const {
     int bytes_read = 0;
+    static std::string accumulated_output;
 
     while (true) {
         std::vector<TerminalChar> chars;
@@ -503,7 +505,22 @@ int TerminalMultiplexer::handle_screen_output(Screen &screen, const int fd) cons
         if (n > 0) {
             bytes_read += n;
             for (TerminalChar &tch : chars) {
+                accumulated_output += tch.sequence;
                 screen.handle_char(tch);
+
+                size_t pos = accumulated_output.find("__ISHELL_EXIT_CODE:");
+                if (pos != std::string::npos) {
+                    size_t end_pos = accumulated_output.find('\n', pos);
+                    if (end_pos != std::string::npos) {
+                        int exit_code = std::stoi(
+                            accumulated_output.substr(pos + 19, end_pos - (pos + 19))
+                        );
+
+                        std::string command_output = accumulated_output.substr(0, pos);
+                        SessionTracker::get().finalizeCommand(exit_code, command_output);
+                        accumulated_output.erase(0, end_pos + 1);
+                    }
+                }
             }
         }
     }
@@ -573,8 +590,10 @@ int TerminalMultiplexer::handle_input() {
 
 void TerminalMultiplexer::handle_pty_input(const int fd, const char ch) {
     if (ch == '\n') {
-        SessionTracker::get().logEvent("shell_command", current_command);
+        SessionTracker::get().logEvent(SessionTracker::EventType::ShellCommand, current_command);
         current_command.clear();
+        const char *exit_code_cmd = "echo \"__ISHELL_EXIT_CODE:$?\"\n";
+        write(fd, exit_code_cmd, strlen(exit_code_cmd));
     } else if (ch == 0x7f || ch == 0x08) { // Backspace
         if (!current_command.empty()) {
             current_command.pop_back();

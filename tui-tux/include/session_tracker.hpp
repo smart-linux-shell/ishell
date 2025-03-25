@@ -1,18 +1,28 @@
 #ifndef SESSION_TRACKER_HPP
 #define SESSION_TRACKER_HPP
 
-#include <fstream>
 #include <string>
-#include <../nlohmann/json.hpp>
+#include <sqlite3.h>
 
 class SessionTracker {
 public:
+    enum class EventType {
+        AgentResponse,
+        UserQuestion,
+        ShellCommand,
+        SystemCommand,
+        SystemMessage,
+        Unknown
+    };
+
     static SessionTracker& get();
 
     void startSession();
     void endSession();
 
-    void logEvent(const std::string& event_type, const std::string& data);
+    void logEvent(EventType event_type, const std::string& data);
+    void logAgentInteraction(const std::string& question, const std::string& response);
+    void finalizeCommand(int exit_code, const std::string& output);
 
 private:
     SessionTracker();
@@ -21,14 +31,12 @@ private:
     SessionTracker(const SessionTracker&) = delete;
     SessionTracker& operator=(const SessionTracker&) = delete;
 
-    std::string generateSessionId();
     void openLogFile();
 
-    nlohmann::json sessionData;
-    std::ofstream logFile;
-
-    std::string sessionId;
-    std::string username;
+    sqlite3 *db;
+    int sessionDbId;
+    int lastInteractionId;
+    int lastCommandId;
 };
 
-#endif
+#endif // SESSION_TRACKER_HPP
