@@ -14,7 +14,7 @@ public:
 
 private:
     const char *shell = "/bin/bash";
-    std::string current_command;
+    std::string current_command = "";
 
     int focus = FOCUS_NULL;
     bool waiting_for_command = false;
@@ -39,10 +39,12 @@ private:
     int handle_screen_output(Screen &screen, int fd) const;
     int handle_input();
 
-    void handle_pty_input(int fd, char ch);
+    static void handle_pty_input(int fd, char ch);
     void zoom_in();
     void zoom_out();
     void toggle_manual_scroll();
+
+    void update_current_command(char ch);
 };
 
 #endif

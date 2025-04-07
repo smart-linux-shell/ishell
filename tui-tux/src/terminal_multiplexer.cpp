@@ -8,7 +8,6 @@
 #include <cstring>
 #include <cerrno>
 #include <string>
-#include <stdio.h>
 
 #include <screen.hpp>
 #include <utils.hpp>
@@ -478,7 +477,6 @@ void TerminalMultiplexer::run_terminal() {
 
 int TerminalMultiplexer::handle_screen_output(Screen &screen, const int fd) const {
     int bytes_read = 0;
-    static std::string accumulated_output;
 
     while (true) {
         std::vector<TerminalChar> chars;
@@ -505,22 +503,7 @@ int TerminalMultiplexer::handle_screen_output(Screen &screen, const int fd) cons
         if (n > 0) {
             bytes_read += n;
             for (TerminalChar &tch : chars) {
-                accumulated_output += tch.sequence;
                 screen.handle_char(tch);
-
-                size_t pos = accumulated_output.find("__ISHELL_EXIT_CODE:");
-                if (pos != std::string::npos) {
-                    size_t end_pos = accumulated_output.find('\n', pos);
-                    if (end_pos != std::string::npos) {
-                        int exit_code = std::stoi(
-                            accumulated_output.substr(pos + 19, end_pos - (pos + 19))
-                        );
-
-                        std::string command_output = accumulated_output.substr(0, pos);
-                        SessionTracker::get().finalizeCommand(exit_code, command_output);
-                        accumulated_output.erase(0, end_pos + 1);
-                    }
-                }
             }
         }
     }
@@ -579,6 +562,7 @@ int TerminalMultiplexer::handle_input() {
                 }
             } else {
                 for (const char ch1 : tch.sequence) {
+                    update_current_command(ch1);
                     handle_pty_input(screens[focus].get_pty_master(), ch1);
                 }
             }
@@ -589,19 +573,6 @@ int TerminalMultiplexer::handle_input() {
 }
 
 void TerminalMultiplexer::handle_pty_input(const int fd, const char ch) {
-    if (ch == '\n') {
-        SessionTracker::get().logEvent(SessionTracker::EventType::ShellCommand, current_command);
-        current_command.clear();
-        const char *exit_code_cmd = "echo \"__ISHELL_EXIT_CODE:$?\"\n";
-        write(fd, exit_code_cmd, strlen(exit_code_cmd));
-    } else if (ch == 0x7f || ch == 0x08) { // Backspace
-        if (!current_command.empty()) {
-            current_command.pop_back();
-        }
-    } else if (isprint(ch)) {
-        current_command.push_back(ch);
-    }
-
     write(fd, &ch, 1);
 }
 
@@ -624,5 +595,18 @@ void TerminalMultiplexer::toggle_manual_scroll() {
             screens[focus].enter_manual_scroll();
             refresh_cursor();
         }
+    }
+}
+
+void TerminalMultiplexer::update_current_command(char ch) {
+    if (ch == KEY_SI || ch == KEY_BS) { // Backspace
+        if (!current_command.empty()) {
+            current_command.pop_back();
+        }
+    } else if (ch == '\r'){
+        SessionTracker::get().logEvent(SessionTracker::EventType::ShellCommand, current_command);
+        current_command.clear();
+    } else {
+        current_command.push_back(ch);
     }
 }

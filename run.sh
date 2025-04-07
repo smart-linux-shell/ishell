@@ -3,24 +3,22 @@
 
 PROJECT_DIR="tui-tux"
 DEPENDENCIES=(
-    "libncurses5-dev"
-    "libncursesw5-dev"
-    "libreadline-dev"
-    "libcurl4-openssl-dev"
+    "ncurses"
+    "readline"
+    "curl"
 )
 
 JSON_DIR="tui-tux/nlohmann"
 RUN_TESTS=false
 
 is_package_installed() {
-    dpkg -s "$1" &> /dev/null
+    pacman -Qi "$1" &> /dev/null
     return $?
 }
 
 install_package() {
     echo "Installing $1..."
-    sudo apt-get update -qq
-    sudo apt-get install -y "$1"
+    sudo pacman -S --noconfirm --needed "$1"
 }
 
 if ! [ -f "$JSON_DIR/json.hpp" ]; then
@@ -39,9 +37,9 @@ fi
 for arg in "$@"; do
     case $arg in
         -t|--test)
-        RUN_TESTS=true
-        shift
-        ;;
+            RUN_TESTS=true
+            shift
+            ;;
     esac
 done
 

@@ -116,16 +116,13 @@ void SessionTracker::logEvent(EventType event_type, const std::string& data) {
             break;
 
         case EventType::SystemCommand:
-            sql = "INSERT INTO system_commands (interaction_id, command_text) VALUES (" +
+            sql = "INSERT INTO commands (interaction_id, command_text) VALUES (" +
                   (lastInteractionId > 0 ? std::to_string(lastInteractionId) : "NULL") +
                   ", '" + escapedData + "');";
             if (sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr) == SQLITE_OK)
                 lastCommandId = sqlite3_last_insert_rowid(db);
             break;
 
-        case EventType::SystemMessage: // for future
-        case EventType::UserQuestion:
-        case EventType::AgentResponse:
         case EventType::Unknown:
             break;
     }

@@ -7,11 +7,8 @@
 class SessionTracker {
 public:
     enum class EventType {
-        AgentResponse,
-        UserQuestion,
         ShellCommand,
         SystemCommand,
-        SystemMessage,
         Unknown
     };
 
