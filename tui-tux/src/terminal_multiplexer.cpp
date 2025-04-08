@@ -15,7 +15,6 @@
 #include <escape.hpp>
 
 #include <terminal_multiplexer.hpp>
-#include <session_tracker.hpp>
 
 #define MAGENTA_FOREGROUND 1
 #define WHITE_FOREGROUND 2
@@ -562,7 +561,6 @@ int TerminalMultiplexer::handle_input() {
                 }
             } else {
                 for (const char ch1 : tch.sequence) {
-                    update_current_command(ch1);
                     handle_pty_input(screens[focus].get_pty_master(), ch1);
                 }
             }
@@ -595,18 +593,5 @@ void TerminalMultiplexer::toggle_manual_scroll() {
             screens[focus].enter_manual_scroll();
             refresh_cursor();
         }
-    }
-}
-
-void TerminalMultiplexer::update_current_command(char ch) {
-    if (ch == KEY_SI || ch == KEY_BS) { // Backspace
-        if (!current_command.empty()) {
-            current_command.pop_back();
-        }
-    } else if (ch == '\r'){
-        SessionTracker::get().logEvent(SessionTracker::EventType::ShellCommand, current_command);
-        current_command.clear();
-    } else {
-        current_command.push_back(ch);
     }
 }

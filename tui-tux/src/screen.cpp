@@ -1,7 +1,9 @@
 #include <ncurses.h>
+#include <cstring>
 
 #include <screen.hpp>
 #include <utils.hpp>
+#include <session_tracker.hpp>
 
 Screen::Screen() = default;
 
@@ -24,6 +26,16 @@ int Screen::get_n_cols() const {
 void Screen::handle_char(const TerminalChar &tch) {
     // CR
     if (tch.ch == '\r') {
+      	int cmd_y = pad_start + n_lines - 1;
+        char buffer[512];  // Размер буфера можно увеличить, если команда может быть длинной
+        memset(buffer, 0, sizeof(buffer));
+
+        // Извлекаем строку из окна pad начиная с позиции (cmd_y, 0)
+        mvwinnstr(pad, cmd_y, 0, buffer, sizeof(buffer) - 1);
+
+        // Вызываем logEvent для записи команды в базу данных
+        SessionTracker::get().logEvent(SessionTracker::EventType::ShellCommand, std::string(buffer));
+
         cursor_return();
     } else if (tch.ch == '\n') {
         newline();
