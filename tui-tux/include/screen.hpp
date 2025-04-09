@@ -85,6 +85,8 @@ public:
     int waddch(WINDOW *window, chtype ch);
     int winsch(WINDOW *window, chtype ch);
     int wmove(WINDOW *window, int y, int x);
+
+	std::string get_visible_line();
 };
 
 #endif

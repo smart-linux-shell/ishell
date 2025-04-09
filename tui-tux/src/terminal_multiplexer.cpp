@@ -15,6 +15,7 @@
 #include <escape.hpp>
 
 #include <terminal_multiplexer.hpp>
+#include <session_tracker.hpp>
 
 #define MAGENTA_FOREGROUND 1
 #define WHITE_FOREGROUND 2
@@ -561,6 +562,9 @@ int TerminalMultiplexer::handle_input() {
                 }
             } else {
                 for (const char ch1 : tch.sequence) {
+                    if(ch == '\r' && focus == FOCUS_BASH){
+          				SessionTracker::get().logEvent(SessionTracker::EventType::ShellCommand, screens[focus].get_visible_line());
+    				}
                     handle_pty_input(screens[focus].get_pty_master(), ch1);
                 }
             }
