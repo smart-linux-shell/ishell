@@ -58,9 +58,9 @@ void SessionTracker::openLogFile() {
 
     std::string schema;
     try {
-        std::ifstream inFile("./local/schema.sql");
+        std::ifstream inFile("./schema.sql");
    		if (!inFile) {
-        	throw std::runtime_error("Can't open file: ./local/schema.sql");
+        	throw std::runtime_error("Can't open file: ./schema.sql");
     	}
     	std::stringstream buffer;
     	buffer << inFile.rdbuf();
