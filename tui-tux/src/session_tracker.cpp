@@ -1,5 +1,8 @@
 #include "session_tracker.hpp"
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
 
 SessionTracker& SessionTracker::get() {
     static SessionTracker instance;
@@ -53,49 +56,21 @@ void SessionTracker::openLogFile() {
         return;
     }
 
-    // sessions -- table with different sessions
-    // interactions -- table for user chat with agent
-    // commands -- bash commands
-    // system_commands -- commands in system mode
-    const char *schemaSql = R"SQL(
-        CREATE TABLE IF NOT EXISTS sessions (
-            session_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            start_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            end_time TIMESTAMP
-        );
-        CREATE TABLE IF NOT EXISTS interactions (
-            interaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id INTEGER,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            agent_question TEXT,
-            agent_message TEXT,
-            recommendation_id TEXT,
-            resolved BOOLEAN DEFAULT 0,
-            FOREIGN KEY(session_id) REFERENCES sessions(session_id)
-        );
-        CREATE TABLE IF NOT EXISTS commands (
-            command_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            interaction_id INTEGER,
-            command_text TEXT,
-            execution_start TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            execution_end TIMESTAMP,
-            exit_code INTEGER,
-            output TEXT,
-            FOREIGN KEY(interaction_id) REFERENCES interactions(interaction_id)
-        );
-        CREATE TABLE IF NOT EXISTS system_commands (
-            system_command_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            interaction_id INTEGER,
-            command_text TEXT,
-            execution_start TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            execution_end TIMESTAMP,
-            exit_code INTEGER,
-            output TEXT,
-            FOREIGN KEY(interaction_id) REFERENCES interactions(interaction_id)
-        );
-    )SQL";
+    std::string schema;
+    try {
+        std::ifstream inFile("./local/schema.sql");
+   		if (!inFile) {
+        	throw std::runtime_error("Can't open file: ./local/schema.sql");
+    	}
+    	std::stringstream buffer;
+    	buffer << inFile.rdbuf();
+    	schema = buffer.str();
+    } catch (const std::exception &ex) {
+        std::cerr << ex.what() << std::endl;
+        return;
+    }
 
-    if (sqlite3_exec(db, schemaSql, nullptr, nullptr, nullptr) != SQLITE_OK) {
+    if (sqlite3_exec(db, schema.c_str(), nullptr, nullptr, nullptr) != SQLITE_OK) {
         std::cerr << "Failed to create schema: " << sqlite3_errmsg(db) << std::endl;
     }
 }
@@ -108,17 +83,17 @@ void SessionTracker::logEvent(EventType event_type, const std::string& data) {
 
     switch (event_type) {
         case EventType::ShellCommand:
-            sql = "INSERT INTO commands (interaction_id, command_text) VALUES (" +
+            sql = "INSERT INTO commands (interaction_id, command_text, shell_command) VALUES (" +
                   (lastInteractionId > 0 ? std::to_string(lastInteractionId) : "NULL") +
-                  ", '" + escapedData + "');";
+                  ", '" + escapedData + "', 1);";
             if (sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr) == SQLITE_OK)
                 lastCommandId = sqlite3_last_insert_rowid(db);
             break;
 
         case EventType::SystemCommand:
-            sql = "INSERT INTO commands (interaction_id, command_text) VALUES (" +
+            sql = "INSERT INTO commands (interaction_id, command_text, shell_command) VALUES (" +
                   (lastInteractionId > 0 ? std::to_string(lastInteractionId) : "NULL") +
-                  ", '" + escapedData + "');";
+                  ", '" + escapedData + "', 0);";
             if (sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr) == SQLITE_OK)
                 lastCommandId = sqlite3_last_insert_rowid(db);
             break;
@@ -129,6 +104,7 @@ void SessionTracker::logEvent(EventType event_type, const std::string& data) {
 
     sqlite3_free(escapedData);
 }
+
 
 void SessionTracker::logAgentInteraction(const std::string& question, const std::string& response) {
     if (!db || sessionDbId == -1) return;
