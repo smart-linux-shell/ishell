@@ -38,3 +38,17 @@ std::string join(std::vector<std::string> &words, const char delim) {
 
     return str;
 }
+
+std::pair<std::string, int> extract_command(const std::string& input) {
+    std::string delimiter = "$ ";
+    size_t pos = input.find(delimiter);
+    if (pos == std::string::npos) {
+        delimiter = "> ";
+        pos = input.find(delimiter);
+        if (pos == std::string::npos) {
+            return std::make_pair(input, 0);
+        }
+        return std::make_pair(input.substr(pos + delimiter.length()), 1);
+    }
+    return std::make_pair(input.substr(pos + delimiter.length()), 2);
+}

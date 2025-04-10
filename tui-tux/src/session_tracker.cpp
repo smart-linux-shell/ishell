@@ -10,7 +10,8 @@ SessionTracker& SessionTracker::get() {
 }
 
 SessionTracker::SessionTracker()
-    : db(nullptr), sessionDbId(-1), lastInteractionId(-1), lastCommandId(-1) {
+    : db(nullptr), sessionDbId(-1), lastInteractionId(-1), lastCommandId(-1),
+      currentCommandText(""), currentCommandOutput("") {
     openLogFile();
 }
 
@@ -31,6 +32,8 @@ void SessionTracker::startSession() {
 
     lastInteractionId = -1;
     lastCommandId = -1;
+    currentCommandText.clear();
+    currentCommandOutput.clear();
 }
 
 void SessionTracker::endSession() {
@@ -46,6 +49,8 @@ void SessionTracker::endSession() {
     sessionDbId = -1;
     lastInteractionId = -1;
     lastCommandId = -1;
+    currentCommandText.clear();
+    currentCommandOutput.clear();
 }
 
 void SessionTracker::openLogFile() {
@@ -75,37 +80,6 @@ void SessionTracker::openLogFile() {
     }
 }
 
-void SessionTracker::logEvent(EventType event_type, const std::string& data) {
-    if (!db) return;
-
-    char *escapedData = sqlite3_mprintf("%q", data.c_str());
-    std::string sql;
-
-    switch (event_type) {
-        case EventType::ShellCommand:
-            sql = "INSERT INTO commands (interaction_id, command_text, shell_command) VALUES (" +
-                  (lastInteractionId > 0 ? std::to_string(lastInteractionId) : "NULL") +
-                  ", '" + escapedData + "', 1);";
-            if (sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr) == SQLITE_OK)
-                lastCommandId = sqlite3_last_insert_rowid(db);
-            break;
-
-        case EventType::SystemCommand:
-            sql = "INSERT INTO commands (interaction_id, command_text, shell_command) VALUES (" +
-                  (lastInteractionId > 0 ? std::to_string(lastInteractionId) : "NULL") +
-                  ", '" + escapedData + "', 0);";
-            if (sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr) == SQLITE_OK)
-                lastCommandId = sqlite3_last_insert_rowid(db);
-            break;
-
-        case EventType::Unknown:
-            break;
-    }
-
-    sqlite3_free(escapedData);
-}
-
-
 void SessionTracker::logAgentInteraction(const std::string& question, const std::string& response) {
     if (!db || sessionDbId == -1) return;
 
@@ -126,24 +100,80 @@ void SessionTracker::logAgentInteraction(const std::string& question, const std:
     sqlite3_free(escapedResponse);
 }
 
-void SessionTracker::finalizeCommand(int exit_code, const std::string& output) {
+void SessionTracker::addNewCommand(EventType command_type) {
+    if (!db) return;
+
+    bool is_shell_command = (command_type == EventType::ShellCommand);
+
+    std::string sql = "INSERT INTO commands (interaction_id, command_text, shell_command) VALUES (" +
+                     (lastInteractionId > 0 ? std::to_string(lastInteractionId) : "NULL") +
+                     ", '', " + 
+                     (is_shell_command ? "1" : "0") + 
+                     ");";
+    
+    if (sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr) != SQLITE_OK) {
+        std::cerr << "Failed to insert command: " << sqlite3_errmsg(db) << std::endl;
+        lastCommandId = -1;
+    } else {
+        lastCommandId = sqlite3_last_insert_rowid(db);
+        currentCommandText.clear();
+        currentCommandOutput.clear();
+    }
+}
+
+void SessionTracker::appendCommandText(const std::string& text) {
     if (!db || lastCommandId == -1) return;
+
+    if (!currentCommandText.empty()) {
+        currentCommandText += "\n";
+    }
+    currentCommandText += text;
+
+    char *escapedText = sqlite3_mprintf("%q", currentCommandText.c_str());
+
+    std::string sql = "UPDATE commands SET command_text = '" + std::string(escapedText) + 
+                     "' WHERE command_id = " + std::to_string(lastCommandId) + ";";
+    
+    if (sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr) != SQLITE_OK) {
+        std::cerr << "Failed to update command text: " << sqlite3_errmsg(db) << std::endl;
+    }
+    
+    sqlite3_free(escapedText);
+}
+
+void SessionTracker::setCommandOutput(const std::string& output) {
+    if (!db || lastCommandId == -1) return;
+
+    currentCommandOutput = output;
 
     char *escapedOutput = sqlite3_mprintf("%q", output.c_str());
 
-    std::string sql = "UPDATE commands SET execution_end = CURRENT_TIMESTAMP, exit_code = " +
-                      std::to_string(exit_code) + ", output = '" + escapedOutput +
-                      "' WHERE command_id = " + std::to_string(lastCommandId) + ";";
-
+    std::string sql = "UPDATE commands SET output = '" + std::string(escapedOutput) + 
+                     "', execution_end = CURRENT_TIMESTAMP WHERE command_id = " + 
+                     std::to_string(lastCommandId) + ";";
+    
     if (sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr) != SQLITE_OK) {
-        std::cerr << "DB update command failed: " << sqlite3_errmsg(db) << std::endl;
+        std::cerr << "Failed to update command output: " << sqlite3_errmsg(db) << std::endl;
+    }
+    
+    sqlite3_free(escapedOutput);
+}
+
+void SessionTracker::setExitCode(int exit_code) {
+    if (!db || lastCommandId == -1) return;
+
+    std::string sql = "UPDATE commands SET exit_code = " + std::to_string(exit_code) + 
+                     " WHERE command_id = " + std::to_string(lastCommandId) + ";";
+    
+    if (sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr) != SQLITE_OK) {
+        std::cerr << "Failed to update command exit code: " << sqlite3_errmsg(db) << std::endl;
     }
 
     if (exit_code == 0 && lastInteractionId > 0) {
         sql = "UPDATE interactions SET resolved = 1 WHERE interaction_id = " + std::to_string(lastInteractionId);
-        sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr);
+        if (sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr) != SQLITE_OK) {
+            std::cerr << "Failed to mark interaction as resolved: " << sqlite3_errmsg(db) << std::endl;
+        }
     }
-
-    sqlite3_free(escapedOutput);
-    lastCommandId = -1;
 }
+

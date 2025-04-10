@@ -475,7 +475,7 @@ void TerminalMultiplexer::run_terminal() {
     close(epoll_fd);
 }
 
-int TerminalMultiplexer::handle_screen_output(Screen &screen, const int fd) const {
+int TerminalMultiplexer::handle_screen_output(Screen &screen, const int fd) {
     int bytes_read = 0;
 
     while (true) {
@@ -511,8 +511,12 @@ int TerminalMultiplexer::handle_screen_output(Screen &screen, const int fd) cons
     if (bytes_read > 0) {
         screen.refresh_screen();
         refresh_cursor();
-    }
 
+        if (focus == FOCUS_BASH && !last_command_finished) {
+            catch_command_output(screen);
+        }
+    }
+    
     return bytes_read;
 }
 
@@ -563,7 +567,7 @@ int TerminalMultiplexer::handle_input() {
             } else {
                 for (const char ch1 : tch.sequence) {
                     if(ch == '\r' && focus == FOCUS_BASH){
-          				SessionTracker::get().logEvent(SessionTracker::EventType::ShellCommand, screens[focus].get_visible_line());
+          				catch_command_input(screens[focus]);
     				}
                     handle_pty_input(screens[focus].get_pty_master(), ch1);
                 }
@@ -596,6 +600,66 @@ void TerminalMultiplexer::toggle_manual_scroll() {
         } else {
             screens[focus].enter_manual_scroll();
             refresh_cursor();
+        }
+    }
+}
+
+void TerminalMultiplexer::catch_command_output(Screen &screen) {
+    bool command_output_finished = false;
+
+    // get current cursor position
+    int cur_y, cur_x;
+    getyx(screen.get_pad(), cur_y, cur_x);
+    std::string command_output;
+
+    if (cur_y > last_shell_command_line + 1 && !command_output_finished) {
+        for (int line = last_shell_command_line + 1; line < cur_y; line++) {
+            std::string line_text = screen.get_line(line);
+            if (!line_text.empty()) {
+                command_output += line_text + "\n";
+            }
+        }
+    }
+
+    //read last visible line(it must be invite for new command)
+    std::string last_line = screen.get_line(cur_y);
+    if (last_line.find('$') != std::string::npos ||
+        last_line.find('>') != std::string::npos) {
+        command_output_finished = true;
+        last_command_finished = true;
+    }
+
+    if (!command_output.empty()) {
+        SessionTracker::get().setCommandOutput(command_output);
+        //SessionTracker::get().setExitCode(0);
+        last_shell_command_line = cur_y;
+    }
+}
+
+void TerminalMultiplexer::catch_command_input(Screen &screen) {
+    int cur_y, cur_x;
+    getyx(screens[focus].get_pad(), cur_y, cur_x);
+    std::string command;
+    int res;
+    std::tie(command, res) = extract_command(screens[focus].get_line(cur_y));
+
+    if (res == 2) {
+        // command start with "[...]$ "
+        SessionTracker::get().addNewCommand(SessionTracker::EventType::ShellCommand);
+        SessionTracker::get().appendCommandText(command);
+        last_shell_command_line = cur_y;
+        last_command_finished = false;
+    } else if (res == 1) {
+        // command start with "> "
+        SessionTracker::get().appendCommandText(command);
+        last_shell_command_line = cur_y;
+        last_command_finished = false;
+    } else {
+        // command is not of first two types
+        if (!command.empty()) {
+            SessionTracker::get().addNewCommand(SessionTracker::EventType::ShellCommand);
+            SessionTracker::get().appendCommandText("ERROR: " + command);
+            SessionTracker::get().setExitCode(-1);
         }
     }
 }

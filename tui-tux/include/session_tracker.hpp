@@ -16,10 +16,13 @@ public:
 
     void startSession();
     void endSession();
-
-    void logEvent(EventType event_type, const std::string& data);
+    
     void logAgentInteraction(const std::string& question, const std::string& response);
-    void finalizeCommand(int exit_code, const std::string& output);
+
+    void addNewCommand(EventType command_type);
+    void appendCommandText(const std::string& text);
+    void setCommandOutput(const std::string& output);
+    void setExitCode(int exit_code);
 
 private:
     SessionTracker();
@@ -34,6 +37,8 @@ private:
     int sessionDbId;
     int lastInteractionId;
     int lastCommandId;
+    std::string currentCommandText;
+    std::string currentCommandOutput;
 };
 
 #endif // SESSION_TRACKER_HPP

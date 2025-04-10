@@ -500,14 +500,14 @@ int Screen::wmove(WINDOW *window, int y, int x) {
     return rc;
 }
 
-std::string Screen::get_visible_line() {
+std::string Screen::get_line(int line_num) {
     char buffer[512];
     memset(buffer, 0, sizeof(buffer));
 
     int cur_y, cur_x;
     getyx(pad, cur_y, cur_x);
 
-    mvwinnstr(pad, cur_y, 0, buffer, sizeof(buffer) - 1);
+    mvwinnstr(pad, line_num, 0, buffer, sizeof(buffer) - 1);
 
     wmove(pad, cur_y, cur_x);
 
