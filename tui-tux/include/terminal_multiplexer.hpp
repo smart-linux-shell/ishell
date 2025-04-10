@@ -2,7 +2,6 @@
 #define ISHELL_TERMINAL_MULTIPLEXER
 
 #include <vector>
-#include <regex>
 
 #include <screen.hpp>
 #include <utils.hpp>
@@ -48,9 +47,6 @@ private:
     void zoom_in();
     void zoom_out();
     void toggle_manual_scroll();
-
-    int extract_exit_code(const std::string& output);
-    std::string remove_exit_code_lines(const std::string& output);
 };
 
 #endif
