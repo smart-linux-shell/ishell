@@ -22,6 +22,7 @@
 std::vector<std::string> split(std::string &str, char delim, bool ignore_empty);
 std::string join(std::vector<std::string> &words, char delim);
 std::pair<std::string, int> extract_command(const std::string& input);
+bool is_shell_prompt(const std::string& line);
 
 #define DEFAULT_AGENCY_URL "https://ishell-stage.csai.site/agents"
 #define DEFAULT_ISHELL_LOCAL_DIR "/etc/ishell"

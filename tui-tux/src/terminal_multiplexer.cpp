@@ -621,10 +621,9 @@ void TerminalMultiplexer::catch_command_output(Screen &screen) {
 
     //read last visible line(it must be invite for new command)
     std::string last_line = screen.get_line(cur_y);
-    if (last_line.find('$') != std::string::npos ||
-        last_line.find('>') != std::string::npos) {
-        last_command_finished = true;
-    }
+    if (is_shell_prompt(last_line)) {
+    	last_command_finished = true;
+	}
 
     if (last_command_finished) {
         SessionTracker::get().setCommandOutput(command_output);

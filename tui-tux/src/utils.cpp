@@ -1,5 +1,7 @@
 #include <utils.hpp>
 
+#include <regex>
+
 std::vector<std::string> split(std::string &str, char delim, bool ignore_empty) {
     std::vector<std::string> words;
     std::string current_str;
@@ -51,4 +53,9 @@ std::pair<std::string, int> extract_command(const std::string& input) {
         return std::make_pair(input.substr(pos + delimiter.length()), 1);
     }
     return std::make_pair(input.substr(pos + delimiter.length()), 2);
+}
+
+bool is_shell_prompt(const std::string& line) {
+    static const std::regex prompt_regex(R"(^\[[\w.-]+@[\w.-]+ [\w./-]+\]\$\s*$)");
+    return std::regex_match(line, prompt_regex);
 }
