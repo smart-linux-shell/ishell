@@ -605,14 +605,12 @@ void TerminalMultiplexer::toggle_manual_scroll() {
 }
 
 void TerminalMultiplexer::catch_command_output(Screen &screen) {
-    bool command_output_finished = false;
-
     // get current cursor position
     int cur_y, cur_x;
     getyx(screen.get_pad(), cur_y, cur_x);
-    std::string command_output;
+    std::string command_output = "";
 
-    if (cur_y > last_shell_command_line + 1 && !command_output_finished) {
+    if (cur_y > last_shell_command_line + 1) {
         for (int line = last_shell_command_line + 1; line < cur_y; line++) {
             std::string line_text = screen.get_line(line);
             if (!line_text.empty()) {
@@ -625,11 +623,10 @@ void TerminalMultiplexer::catch_command_output(Screen &screen) {
     std::string last_line = screen.get_line(cur_y);
     if (last_line.find('$') != std::string::npos ||
         last_line.find('>') != std::string::npos) {
-        command_output_finished = true;
         last_command_finished = true;
     }
 
-    if (!command_output.empty()) {
+    if (last_command_finished) {
         SessionTracker::get().setCommandOutput(command_output);
         //SessionTracker::get().setExitCode(0);
         last_shell_command_line = cur_y;
