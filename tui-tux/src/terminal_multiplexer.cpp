@@ -8,6 +8,7 @@
 #include <cstring>
 #include <cerrno>
 #include <string>
+#include <fstream>
 
 #include <screen.hpp>
 #include <utils.hpp>
@@ -71,6 +72,11 @@ void TerminalMultiplexer::init() {
 
         // Set TERM type
         setenv("TERM", "ishell-m", 1);
+        
+        // Set up PROMPT_COMMAND to write exit code to a file
+        // The file will be named ./local/exit_code_PID where PID is the process ID
+                const char* prompt_cmd = "status=$?; echo $status > ./local/exit_code_$$";
+        setenv("PROMPT_COMMAND", prompt_cmd, 1);
 
         // Execute the shell
         execl(shell, shell, NULL);
@@ -306,6 +312,14 @@ void TerminalMultiplexer::delete_windows() {
 }
 
 void TerminalMultiplexer::cleanup() {
+    for (Screen &screen : screens) {
+        std::string file_path = "./local/exit_code_" + std::to_string(screen.get_pid());
+        if (remove(file_path.c_str()) != 0) {
+            if (errno != ENOENT) {
+                perror(("remove " + file_path).c_str());
+            }
+        }
+    }
     delete_windows();
     endwin();
 }
@@ -605,29 +619,41 @@ void TerminalMultiplexer::toggle_manual_scroll() {
 }
 
 void TerminalMultiplexer::catch_command_output(Screen &screen) {
-    // get current cursor position
+
     int cur_y, cur_x;
     getyx(screen.get_pad(), cur_y, cur_x);
     std::string command_output = "";
+    int exit_code = 0;
 
-    if (cur_y > last_shell_command_line + 1) {
-        for (int line = last_shell_command_line + 1; line < cur_y; line++) {
-            std::string line_text = screen.get_line(line);
-            if (!line_text.empty()) {
-                command_output += line_text + "\n";
-            }
-        }
-    }
-
-    //read last visible line(it must be invite for new command)
     std::string last_line = screen.get_line(cur_y);
+    
     if (is_shell_prompt(last_line)) {
     	last_command_finished = true;
+
+        // Read the command output
+        if (cur_y > last_shell_command_line + 1) {
+            for (int line = last_shell_command_line + 1; line < cur_y; line++) {
+                std::string line_text = screen.get_line(line);
+                if (!line_text.empty()) {
+                    command_output += line_text + "\n";
+                }
+            }
+        }
+
+        // Read the exit code from the temp file
+        int pid = screen.get_pid();
+        std::string exit_code_file = "./local/exit_code_" + std::to_string(pid);
+        
+        std::ifstream file(exit_code_file);
+        if (file.is_open()) {
+            file >> exit_code;
+            file.close();
+        }
 	}
 
     if (last_command_finished) {
         SessionTracker::get().setCommandOutput(command_output);
-        //SessionTracker::get().setExitCode(0);
+        SessionTracker::get().setExitCode(exit_code);
         last_shell_command_line = cur_y;
     }
 }
