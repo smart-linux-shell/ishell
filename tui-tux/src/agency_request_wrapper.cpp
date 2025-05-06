@@ -4,6 +4,7 @@
 #include <sys/utsname.h>
 #include <string>
 #include <iostream>
+#include <fstream>
 #include "../nlohmann/json.hpp"
 #include <https_client.hpp>
 #include <agency_request_wrapper.hpp>
@@ -14,17 +15,39 @@ using json = nlohmann::json;
 
 // Function to get Linux distribution
 std::string AgencyRequestWrapper::get_linux_distro() {
-    utsname buffer{};
-    if (uname(&buffer) != 0) {
-        return "Unknown";
+    std::ifstream f("/etc/os-release");
+    if (f) {
+        std::string line;
+        while (std::getline(f, line)) {
+            if (line.rfind("ID=", 0) == 0) {
+                std::string id = line.substr(3);
+                if (!id.empty() && id.front() == '"')  id.erase(0, 1);
+                if (!id.empty() && id.back()  == '"')  id.pop_back();
+                return id;            // arch, debian, ubuntu, fedora, …
+            }
+        }
     }
-    return std::string(buffer.sysname) + std::string(" ") + std::string(buffer.version); // or use buffer.release, buffer.version
+    // fallback → uname
+    utsname buf{};
+    return (uname(&buf) == 0) ? std::string(buf.sysname) : "Unknown";
 }
 
 // Function to get installed packages (simple example using dpkg on Debian/Ubuntu systems)
 std::vector<std::string> AgencyRequestWrapper::get_installed_packages() {
+    const std::string distro = get_linux_distro();
+    std::string cmd;
+    if (distro == "arch" || distro == "manjaro") {
+        cmd = "pacman -Qq";
+    } else if (distro == "debian" || distro == "ubuntu") {
+        cmd = "dpkg --get-selections | awk '{print $1}'";
+    } else if (distro == "fedora") {
+        cmd = "rpm -qa --qf '%{NAME}\\n'";
+    } else {
+        cmd = "echo";                       // fallback
+    }
+
     std::vector<std::string> packages;
-    FILE* pipe = popen("dpkg --get-selections | awk '{print $1}'", "r");
+    FILE* pipe = popen(cmd.c_str(), "r");;
     if (!pipe) {
         return packages;
     }
@@ -110,6 +133,7 @@ std::string AgencyRequestWrapper::ask_agent(const std::string& url, const std::s
     }
 
     std::cerr << "\"content\" field not found in response body" << std::endl;
+    std::cerr << response.dump(2) << '\n';
     return "";
 }
 

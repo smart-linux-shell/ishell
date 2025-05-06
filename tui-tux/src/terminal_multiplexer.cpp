@@ -8,15 +8,14 @@
 #include <cstring>
 #include <cerrno>
 #include <string>
-#include <fstream>
 
 #include <screen.hpp>
 #include <utils.hpp>
 #include <agent.hpp>
 #include <escape.hpp>
 
-#include <terminal_multiplexer.hpp>
 #include <session_tracker.hpp>
+#include <terminal_multiplexer.hpp>
 
 #define MAGENTA_FOREGROUND 1
 #define WHITE_FOREGROUND 2
@@ -49,8 +48,8 @@ void TerminalMultiplexer::init() {
     if (bash_pid < 0) {
         perror("fork: bash_pty");
         exit(EXIT_FAILURE);
-    } 
-    
+    }
+
     if (bash_pid == 0) {
         // Child process will execute the shell
         close(pty_bash_master);
@@ -71,12 +70,7 @@ void TerminalMultiplexer::init() {
         close(pty_bash_slave);
 
         // Set TERM type
-        setenv("TERM", "ishell-m", 1);
-        
-        // Set up PROMPT_COMMAND to write exit code to a file
-        // The file will be named ./local/exit_code_PID where PID is the process ID
-                const char* prompt_cmd = "status=$?; echo $status > ./local/exit_code_$$";
-        setenv("PROMPT_COMMAND", prompt_cmd, 1);
+        setenv("TERM", "ishell-m", 1); // xterm-256color
 
         // Execute the shell
         execl(shell, shell, NULL);
@@ -173,6 +167,7 @@ void TerminalMultiplexer::init_nc() {
     noecho();
 
     create_wins_draw();
+    send_dims();
 }
 
 void TerminalMultiplexer::refresh_cursor() const {
@@ -275,7 +270,7 @@ void TerminalMultiplexer::create_wins_draw() {
 
     // Resize old screens
     std::vector<Screen> new_screens;
-    
+
     // Agent
     Screen screen = Screen(agent_lines, agent_cols, screens[0]);
     screen.set_screen_coords(agent_y, agent_x, agent_y + agent_lines - 1, agent_x + agent_cols - 1);
@@ -312,14 +307,6 @@ void TerminalMultiplexer::delete_windows() {
 }
 
 void TerminalMultiplexer::cleanup() {
-    for (Screen &screen : screens) {
-        std::string file_path = "./local/exit_code_" + std::to_string(screen.get_pid());
-        if (remove(file_path.c_str()) != 0) {
-            if (errno != ENOENT) {
-                perror(("remove " + file_path).c_str());
-            }
-        }
-    }
     delete_windows();
     endwin();
 }
@@ -449,7 +436,7 @@ void TerminalMultiplexer::run_terminal() {
                 if (n_in == 0) {
                     epolling = false;
                     break;
-                }    
+                }
             } else if (events[i].data.fd == sigfd) {
                 // Read the signal
                 signalfd_siginfo sigfd_info{};
@@ -514,9 +501,59 @@ int TerminalMultiplexer::handle_screen_output(Screen &screen, const int fd) {
             exit(EXIT_FAILURE);
         }
 
+		//-------------------------------------------------- прочитали символы которые надо передать на экран (как пользователя так и самого окнка) -----------------------------
         if (n > 0) {
             bytes_read += n;
             for (TerminalChar &tch : chars) {
+                /* ────── Bash‑специфичные метки OSC 133 ───── */
+                bool is_bash_screen = (&screen == &screens[FOCUS_BASH]);
+                if (is_bash_screen && tch.ch >= E_OSC_PROMPT_START && tch.ch <= E_OSC_CMD_FINISH) {
+                    switch (tch.ch) {
+                        case E_OSC_PROMPT_START: {
+                            bash_waiting_for_prompt = false;
+                            int command_line = getcury(screen.get_pad());
+                            if(last_command_line >= 0 && command_line == (last_command_line + 1)) {
+                                last_command_line = command_line;
+                            }else{
+                                first_command_line = command_line;
+                                last_command_line = command_line;
+                            }
+                            break;
+                        }
+
+                        case E_OSC_PRE_EXEC: {
+                            if(bash_waiting_for_prompt) break;
+                            std::string cmd = "";
+                            for (int i = first_command_line; i <= last_command_line; i++) {
+                                cmd += screen.get_line(i);
+                            }
+                            SessionTracker::get().addNewCommand(SessionTracker::EventType::ShellCommand);
+                            SessionTracker::get().appendCommandText(cmd);
+
+                            bash_output.clear();
+                            bash_capturing = true;
+                            break;
+                        }
+
+                        case E_OSC_CMD_FINISH: {
+                            if(bash_waiting_for_prompt) break;
+                            bash_capturing = false;
+                            SessionTracker::get().setCommandOutput(bash_output);
+                            if (!tch.args.empty())
+                                SessionTracker::get().setExitCode(tch.args[0]);
+                            first_command_line = -1;
+                            last_command_line = -1;
+                            break;
+                        }
+                    }
+                    continue;
+                }
+
+                /* ────── накапливаем stdout команды ───── */
+                if (is_bash_screen && bash_capturing && tch.ch < 256 && tch.ch != '\r') {
+                    bash_output.push_back(static_cast<char>(tch.ch));
+                }
+
                 screen.handle_char(tch);
             }
         }
@@ -525,12 +562,8 @@ int TerminalMultiplexer::handle_screen_output(Screen &screen, const int fd) {
     if (bytes_read > 0) {
         screen.refresh_screen();
         refresh_cursor();
-
-        if (focus == FOCUS_BASH && !last_command_finished) {
-            catch_command_output(screen);
-        }
     }
-    
+
     return bytes_read;
 }
 
@@ -579,10 +612,8 @@ int TerminalMultiplexer::handle_input() {
                     refresh_cursor();
                 }
             } else {
+				// ----------------------------------------------------- читаем символы введеные пользователем -----------------------------------------------
                 for (const char ch1 : tch.sequence) {
-                    if(ch == '\r' && focus == FOCUS_BASH){
-          				catch_command_input(screens[focus]);
-    				}
                     handle_pty_input(screens[focus].get_pty_master(), ch1);
                 }
             }
@@ -614,74 +645,6 @@ void TerminalMultiplexer::toggle_manual_scroll() {
         } else {
             screens[focus].enter_manual_scroll();
             refresh_cursor();
-        }
-    }
-}
-
-void TerminalMultiplexer::catch_command_output(Screen &screen) {
-
-    int cur_y, cur_x;
-    getyx(screen.get_pad(), cur_y, cur_x);
-    std::string command_output = "";
-    int exit_code = 0;
-
-    std::string last_line = screen.get_line(cur_y);
-    
-    if (is_shell_prompt(last_line)) {
-    	last_command_finished = true;
-
-        // Read the command output
-        if (cur_y > last_shell_command_line + 1) {
-            for (int line = last_shell_command_line + 1; line < cur_y; line++) {
-                std::string line_text = screen.get_line(line);
-                if (!line_text.empty()) {
-                    command_output += line_text + "\n";
-                }
-            }
-        }
-
-        // Read the exit code from the temp file
-        int pid = screen.get_pid();
-        std::string exit_code_file = "./local/exit_code_" + std::to_string(pid);
-        
-        std::ifstream file(exit_code_file);
-        if (file.is_open()) {
-            file >> exit_code;
-            file.close();
-        }
-	}
-
-    if (last_command_finished) {
-        SessionTracker::get().setCommandOutput(command_output);
-        SessionTracker::get().setExitCode(exit_code);
-        last_shell_command_line = cur_y;
-    }
-}
-
-void TerminalMultiplexer::catch_command_input(Screen &screen) {
-    int cur_y, cur_x;
-    getyx(screens[focus].get_pad(), cur_y, cur_x);
-    std::string command;
-    int res;
-    std::tie(command, res) = extract_command(screens[focus].get_line(cur_y));
-
-    if (res == 2) {
-        // command start with "[...]$ "
-        SessionTracker::get().addNewCommand(SessionTracker::EventType::ShellCommand);
-        SessionTracker::get().appendCommandText(command);
-        last_shell_command_line = cur_y;
-        last_command_finished = false;
-    } else if (res == 1) {
-        // command start with "> "
-        SessionTracker::get().appendCommandText(command);
-        last_shell_command_line = cur_y;
-        last_command_finished = false;
-    } else {
-        // command is not of first two types
-        if (!command.empty()) {
-            SessionTracker::get().addNewCommand(SessionTracker::EventType::ShellCommand);
-            SessionTracker::get().appendCommandText("ERROR: " + command);
-            SessionTracker::get().setExitCode(-1);
         }
     }
 }

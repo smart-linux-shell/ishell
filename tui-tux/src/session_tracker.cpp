@@ -80,6 +80,8 @@ void SessionTracker::openLogFile() {
     }
 }
 
+//---------------------------------- tracking user interaction ---------------------------------------
+
 void SessionTracker::logAgentInteraction(const std::string& question, const std::string& response) {
     if (!db || sessionDbId == -1) return;
 

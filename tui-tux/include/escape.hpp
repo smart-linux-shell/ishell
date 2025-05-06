@@ -38,6 +38,12 @@
 // Insert character
 #define E_KEY_ICH 266
 
+// ────────── OSC 133 (semantic prompt marks) ──────────
+#define E_OSC_PROMPT_START  512   // 133;A
+#define E_OSC_PROMPT_END    513   // 133;B
+#define E_OSC_PRE_EXEC      514   // 133;C
+#define E_OSC_CMD_FINISH    515   // 133;D;<exit>
+
 struct TerminalChar {
     int ch;
     std::vector<int> args;

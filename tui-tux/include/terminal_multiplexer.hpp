@@ -18,8 +18,6 @@ private:
     int focus = FOCUS_NULL;
     bool waiting_for_command = false;
     bool zoomed_in = false;
-    bool last_command_finished = true;
-    int last_shell_command_line = 0;
 
     WINDOW *bottom_bar = nullptr, *middle_divider = nullptr;
 
@@ -40,13 +38,17 @@ private:
     int handle_screen_output(Screen &screen, int fd);
     int handle_input();
 
-    void catch_command_output(Screen &screen);
-    void catch_command_input(Screen &screen);
-
     static void handle_pty_input(int fd, char ch);
     void zoom_in();
     void zoom_out();
     void toggle_manual_scroll();
+
+    /* ────────── OSC 133 state (bash‑экран) ────────── */
+    bool bash_capturing = false;
+    bool bash_waiting_for_prompt = true;
+    std::string bash_output;
+    int last_command_line = -10;
+    int first_command_line = -10;
 };
 
 #endif

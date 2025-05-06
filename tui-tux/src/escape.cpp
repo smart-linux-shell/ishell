@@ -54,10 +54,32 @@ TerminalChar escape(const std::string &seq) {
     return ret;
 }
 
+static TerminalChar make_osc133(const std::string& body)
+{
+    TerminalChar t{};   // по‑умолчанию ch==0
+
+    std::smatch m;
+    std::regex r(R"(133;([ABCD])(?:;(\d+))?)");
+    if (!std::regex_match(body, m, r)) return t;
+
+    char id = m[1].str()[0];
+    switch(id) {
+        case 'A': t.ch = E_OSC_PROMPT_START; break;
+        case 'B': t.ch = E_OSC_PROMPT_END;   break;
+        case 'C': t.ch = E_OSC_PRE_EXEC;     break;
+        case 'D': t.ch = E_OSC_CMD_FINISH;
+                  if (m[2].matched) t.args.push_back(std::stoi(m[2]));
+                  break;
+    }
+    return t;
+}
+
 int read_and_escape(const int fd, std::vector<TerminalChar> &vec) {
     struct FdEscapeData {
         bool in_escape{};
+        bool in_osc{};
         std::string escape_seq;
+        std::string osc_seq;
     };
 
     static std::unordered_map<int, FdEscapeData> fd_escape_data;
@@ -77,14 +99,36 @@ int read_and_escape(const int fd, std::vector<TerminalChar> &vec) {
     vec = std::vector<TerminalChar>();
 
     for (ssize_t i = 0; i < n; i++) {
-        // ESC sequence
+        /* ── начало ESC (CSI или OSC) ── */
         if (buf[i] == 0x1B) {
             fd_escape_data[fd].in_escape = true;
+            if (i+1 < n && buf[i+1] == ']') {              // OSC
+                fd_escape_data[fd].in_osc   = true;
+                fd_escape_data[fd].osc_seq  = "";
+                i++;                                   // пропустили ']'
+                continue;
+            }
             fd_escape_data[fd].escape_seq = "\x1B";
             continue;
         }
 
         if (fd_escape_data[fd].in_escape) {
+            /* ────────── внутри OSC ────────── */
+            if (fd_escape_data[fd].in_osc) {
+                // terminator: BEL 0x07 ИЛИ ESC
+                if (buf[i] == 0x07 || (buf[i] == 0x1B && i+1 < n && buf[i+1]=='\\')) {
+                    TerminalChar tch = make_osc133(fd_escape_data[fd].osc_seq);
+                    if (tch.ch) vec.push_back(tch);
+
+                    fd_escape_data[fd].in_osc = false;
+                    fd_escape_data[fd].in_escape = false;
+                    fd_escape_data[fd].osc_seq.clear();
+                    continue;
+                }
+                fd_escape_data[fd].osc_seq.push_back(buf[i]);
+                continue;
+            }
+
             if (buf[i] != 0x9c) {
                 fd_escape_data[fd].escape_seq += buf[i];
             }
