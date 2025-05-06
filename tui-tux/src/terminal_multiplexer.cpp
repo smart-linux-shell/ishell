@@ -526,11 +526,11 @@ int TerminalMultiplexer::handle_screen_output(Screen &screen, const int fd) {
                             std::string cmd = "";
                             for (int i = first_command_line; i <= last_command_line; i++) {
                                 cmd += screen.get_line(i);
+                                cmd += "\n";
                             }
                             SessionTracker::get().addNewCommand(SessionTracker::EventType::ShellCommand);
                             SessionTracker::get().appendCommandText(cmd);
 
-                            bash_output.clear();
                             bash_capturing = true;
                             break;
                         }
@@ -538,20 +538,24 @@ int TerminalMultiplexer::handle_screen_output(Screen &screen, const int fd) {
                         case E_OSC_CMD_FINISH: {
                             if(bash_waiting_for_prompt) break;
                             bash_capturing = false;
-                            SessionTracker::get().setCommandOutput(bash_output);
+
+                            std::string cmd = "";
+                            int command_line = getcury(screen.get_pad());
+                            for (int i = last_command_line + 1; i <= command_line; i++) {
+                                cmd += screen.get_line(i);
+                                cmd += "\n";
+                            }
+                            SessionTracker::get().setCommandOutput(cmd);
                             if (!tch.args.empty())
                                 SessionTracker::get().setExitCode(tch.args[0]);
-                            first_command_line = -1;
-                            last_command_line = -1;
+
+                            first_command_line = -10;
+                            last_command_line = -10;
+                            bash_waiting_for_prompt = true;
                             break;
                         }
                     }
                     continue;
-                }
-
-                /* ────── накапливаем stdout команды ───── */
-                if (is_bash_screen && bash_capturing && tch.ch < 256 && tch.ch != '\r') {
-                    bash_output.push_back(static_cast<char>(tch.ch));
                 }
 
                 screen.handle_char(tch);

@@ -54,12 +54,12 @@ TerminalChar escape(const std::string &seq) {
     return ret;
 }
 
-static TerminalChar make_osc133(const std::string& body)
+static TerminalChar make_osc_mark(const std::string& body)
 {
-    TerminalChar t{};   // по‑умолчанию ch==0
+    TerminalChar t{};
 
     std::smatch m;
-    std::regex r(R"(133;([ABCD])(?:;(\d+))?)");
+    std::regex r(R"(333;([ABCD])(?:;(\d+))?)");
     if (!std::regex_match(body, m, r)) return t;
 
     char id = m[1].str()[0];
@@ -117,7 +117,7 @@ int read_and_escape(const int fd, std::vector<TerminalChar> &vec) {
             if (fd_escape_data[fd].in_osc) {
                 // terminator: BEL 0x07 ИЛИ ESC
                 if (buf[i] == 0x07 || (buf[i] == 0x1B && i+1 < n && buf[i+1]=='\\')) {
-                    TerminalChar tch = make_osc133(fd_escape_data[fd].osc_seq);
+                    TerminalChar tch = make_osc_mark(fd_escape_data[fd].osc_seq);
                     if (tch.ch) vec.push_back(tch);
 
                     fd_escape_data[fd].in_osc = false;
