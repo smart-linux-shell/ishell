@@ -17,15 +17,19 @@ public:
     virtual std::string get_ssh_ip();
     virtual int get_ssh_port();
     virtual std::string get_ssh_user();
-    json send_request_to_agent_server(const std::string &url, const std::string &user_query, std::vector<std::pair<std::string, std::string>> &session_history);
+    json send_request_to_agent_server(const std::string &url, std::string user_query, bool include_session_history);
 
-    static std::string get_session_history_string(std::vector<std::pair<std::string, std::string>> &session_history);
-    virtual std::string ask_agent(const std::string &url, const std::string &user_query, std::vector<std::pair<std::string, std::string>> &session_history);
+    static std::string get_session_history_string();
+
+    virtual std::string ask_agent(const std::string &url, std::string user_query, bool include_session_history);
+
     virtual json make_http_request(HttpRequestType request_type, const std::string& url,
                         const std::map<std::string, std::string>& query_params,
                         const json& body,
                         const std::map<std::string, std::string>& headers);
     virtual char *getenv(const char *key);
+
+    std::vector<std::string> context;
 };
 
 #endif // AGENCY_REQUEST_WRAPPER_HPP

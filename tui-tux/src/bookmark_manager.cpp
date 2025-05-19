@@ -2,10 +2,12 @@
 #include <sstream>
 #include <iostream>
 #include <iomanip>
+#include <optional>
 #include <unordered_map>
 #include "../nlohmann/json.hpp"
 #include <bookmark_manager.hpp>
 #include <agency_manager.hpp>
+#include <session_tracker.hpp>
 #include <sys/stat.h>
 
 using json = nlohmann::json;
@@ -15,7 +17,7 @@ BookmarkManager::BookmarkManager(AgencyManager* agency_manager) {
 }
 
 BookmarkManager::~BookmarkManager() = default;
-
+/*
 std::string BookmarkManager::get_bookmarks_file_path() {
     std::string file_path;
     if (char *local_dir = getenv("ISHELL_LOCAL_DIR"); local_dir == nullptr) {
@@ -41,7 +43,7 @@ std::string BookmarkManager::get_bookmarks_file_path() {
 
     return file_path;
 }
-
+*/
 bool BookmarkManager::create_bookmarks_file(const std::string &filename) {
     std::ofstream create_file(filename);
     if (!create_file) {
@@ -103,25 +105,72 @@ std::pair<std::string, std::string> BookmarkManager::get_bookmark(const std::str
     return {"", ""}; // Return an empty pair if not found
 }
 
-void BookmarkManager::bookmark(int index, const std::string &alias) {
-   // bookmark already exists
+void BookmarkManager::bookmark(int first, int last, const std::string& alias){
+    // bookmark already exists
     if (bookmarks.find(alias) != bookmarks.end()) {
         std::cerr << "Error: Bookmark '" << alias << "' already exists.\n";
         return;
     }
 
-    // find <query, result> pair
-   const int len = static_cast<int>(agency_manager->session_history.size());
-    if (index <= 0 || index > len) {
-        std::cerr << "Error: Invalid history index.\n";
+    const auto& hist = SessionTracker::get().get_history(); // vector<Interaction>
+    if (hist.empty()) {
+        std::cerr << "Nothing to bookmark – history is empty\n";
         return;
     }
 
-    auto pair = agency_manager->session_history[len - index];
+    std::ostringstream buf;
 
-    // bookmark
-    bookmarks[alias] = pair;
-    std::cout << "Saved the query under the bookmark '" << alias  << "'" << "\n";
+    if(hist[0].shell.size() > 0 && first == 0){
+        for (const auto& cmd : hist[0].shell){
+            buf << '[' << cmd.execution_start << "] " << cmd.command << '\n'
+                << cmd.output << '\n'
+                << "[exit code: " << cmd.exit_code
+                << ", finished " << cmd.execution_end << "]\n\n";
+        }
+        buf << "----------------------------------------\n";
+    }
+
+    const int total = static_cast<int>(hist.size());
+    const int firstIdx = std::max(1, first);
+    const int lastIdx = std::min(total, last + 1);
+
+    if (lastIdx == 1 && hist[0].shell.empty()) {
+        std::cerr << "Nothing to bookmark – history is empty\n";
+        return;
+    }
+
+    if (firstIdx > lastIdx) {
+        std::cerr << "Invalid range (" << firstIdx << "-" << lastIdx << ")\n";
+        return;
+    }
+
+    for (int i = firstIdx; i < lastIdx; i++)
+    {
+        const auto& inter = hist[i];
+        buf << '[' << inter.timestamp << "] Question: " << inter.question << '\n'
+            << "Answer: " << inter.answer << "\n\n";
+
+        for (const auto& cmd : inter.shell)
+        {
+            buf << '[' << cmd.execution_start << "] " << cmd.command << '\n'
+                << cmd.output << '\n'
+                << "[exit code: " << cmd.exit_code
+                << ", finished " << cmd.execution_end << "]\n\n";
+        }
+        buf << "----------------------------------------\n";
+    }
+
+    std::string question = "";
+    if(firstIdx != lastIdx){
+        question = hist[firstIdx].question;
+    }
+
+    bookmarks[alias] = std::make_pair(
+            /* title = */ question,
+            /* body  = */ buf.str()
+        );
+
+    std::cout << "Bookmark added: " << alias << '\n';
 }
 
 void BookmarkManager::remove_bookmark(const std::string &alias) {
@@ -135,7 +184,7 @@ void BookmarkManager::remove_bookmark(const std::string &alias) {
 }
 
 void BookmarkManager::list_bookmarks() const {
-    constexpr int alias_width = 20;
+    constexpr int alias_width = 30;
     constexpr int query_width = 50;
     std::cout << std::left << std::setw(alias_width) << "BOOKMARK"
               << std::setw(query_width) << "QUERY" << "\n";

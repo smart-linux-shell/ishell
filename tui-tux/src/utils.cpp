@@ -2,7 +2,7 @@
 
 #include <regex>
 
-std::vector<std::string> split(std::string &str, char delim, bool ignore_empty) {
+std::vector<std::string> split(const std::string &str, char delim, bool ignore_empty) {
     std::vector<std::string> words;
     std::string current_str;
 
@@ -39,4 +39,11 @@ std::string join(std::vector<std::string> &words, const char delim) {
     }
 
     return str;
+}
+
+bool is_range_token(const std::string& s) {
+    // "N-M", "-M", "N-"
+    static const std::regex re(R"(^(\d*)-(\d*)$)");
+    std::smatch m;
+    return std::regex_match(s, m, re) && (m[1].length() || m[2].length());
 }

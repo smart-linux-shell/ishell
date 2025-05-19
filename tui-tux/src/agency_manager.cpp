@@ -30,9 +30,7 @@ void AgencyManager::set_agent_name(const std::string &agent_name) {
     this->agent_name = agent_name;
 }
 
-std::string AgencyManager::execute_query(const std::string &endpoint, const std::string &query) {
-    std::string result = request_wrapper->ask_agent(endpoint, query, session_history);
-    session_history.emplace_back(query, result);
-
+std::string AgencyManager::execute_query(const std::string &endpoint, std::string query, bool include_session_history) {
+    std::string result = request_wrapper->ask_agent(endpoint, query, include_session_history);
     return result;
 }

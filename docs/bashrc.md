@@ -22,3 +22,5 @@ PS1='\[\e]333;A\a\]\u@\h:\w\$ \[\e]333;B\a\]'
 PS2='\[\e]333;A\a\]> \[\e]333;B\a\]'
 PS3='\[\e]333;A\a\]#? \[\e]333;B\a\]'
 ```
+
+description of a standart - https://gitlab.freedesktop.org/Per_Bothner/specifications/-/blob/master/proposals/semantic-prompts.md

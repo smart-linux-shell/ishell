@@ -9,6 +9,7 @@
 
 #include <agency_manager.hpp>
 #include <bookmark_manager.hpp>
+#include <markdown_manager.hpp>
 #include <agency_request_wrapper.hpp>
 #include <session_tracker.hpp>
 
@@ -24,7 +25,8 @@ std::vector<std::vector<std::string>> history_storage;      // stores histories 
 AgencyRequestWrapper request_wrapper;
 AgencyManager manager(&request_wrapper);
 BookmarkManager bookmark_manager(&manager);
-CommandManager command_manager(&bookmark_manager);
+MarkdownManager markdown_manager;
+CommandManager command_manager(&bookmark_manager, &markdown_manager);
 
 bool running = true;
 int prompt_mode = MODE_AGENT;
@@ -55,7 +57,7 @@ void line_handler(char *line) {
     if (prompt_mode == MODE_AGENT) {
         // New query to agent
         const std::string agency = manager.get_agency_url();
-        const std::string result = manager.execute_query(agency + "/" + bookmark_manager.agency_manager->get_agent_name(), input_str);
+        const std::string result = manager.execute_query(agency + "/" + bookmark_manager.agency_manager->get_agent_name(), input_str, true);
         std::cout << result << "\n";
 
         SessionTracker::get().logAgentInteraction(input_str, result);
@@ -78,6 +80,7 @@ void agent() {
     manager.get_agency_url();
 
     bookmark_manager.load_bookmarks("local/bookmarks.json");
+	markdown_manager.load_markdowns("local/markdowns.json");
 
     const std::string system_name = "system";
 
@@ -111,5 +114,6 @@ void agent() {
     }
 
     bookmark_manager.save_bookmarks("local/bookmarks.json");
+	markdown_manager.save_markdowns("local/markdowns.json");
     SessionTracker::get().endSession();
 }

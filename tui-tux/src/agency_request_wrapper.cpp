@@ -8,6 +8,7 @@
 #include "../nlohmann/json.hpp"
 #include <https_client.hpp>
 #include <agency_request_wrapper.hpp>
+#include <session_tracker.hpp>
 
 #define INSTALLED_PACKAGES_BUFSIZ 128
 
@@ -34,20 +35,8 @@ std::string AgencyRequestWrapper::get_linux_distro() {
 
 // Function to get installed packages (simple example using dpkg on Debian/Ubuntu systems)
 std::vector<std::string> AgencyRequestWrapper::get_installed_packages() {
-    const std::string distro = get_linux_distro();
-    std::string cmd;
-    if (distro == "arch" || distro == "manjaro") {
-        cmd = "pacman -Qq";
-    } else if (distro == "debian" || distro == "ubuntu") {
-        cmd = "dpkg --get-selections | awk '{print $1}'";
-    } else if (distro == "fedora") {
-        cmd = "rpm -qa --qf '%{NAME}\\n'";
-    } else {
-        cmd = "echo";                       // fallback
-    }
-
     std::vector<std::string> packages;
-    FILE* pipe = popen(cmd.c_str(), "r");;
+    FILE* pipe = popen("dpkg --get-selections | awk '{print $1}'", "r");
     if (!pipe) {
         return packages;
     }
@@ -84,13 +73,23 @@ std::string AgencyRequestWrapper::get_ssh_user() {
 }
 
 // Function to send request to agent's server
-json AgencyRequestWrapper::send_request_to_agent_server(const std::string& url, const std::string& user_query, std::vector<std::pair<std::string, std::string>> &session_history) {
+json AgencyRequestWrapper::send_request_to_agent_server(const std::string& url, std::string user_query, bool include_session_history) {
     std::string distro = get_linux_distro();
     std::vector<std::string> installed_packages = get_installed_packages();
     std::string ssh_ip = get_ssh_ip();
     int ssh_port = get_ssh_port();
     std::string ssh_user = get_ssh_user();
-    std::string history = get_session_history_string(session_history);
+	std::string history = "";
+	if(include_session_history){
+    	std::string history = get_session_history_string();
+	}
+
+    if(context.size() > 0){
+        user_query += "\n<additional context>\n";
+        for(auto doc : context){
+            user_query += doc + "\n";
+        }
+    }
 
     const json request_body = {
         {"distro", distro},
@@ -117,14 +116,37 @@ json AgencyRequestWrapper::send_request_to_agent_server(const std::string& url, 
     return response;
 }
 
+std::string AgencyRequestWrapper::get_session_history_string() {
+    const auto& hist = SessionTracker::get().get_history(); // vector<Interaction>
+
+    std::ostringstream buf;
+
+    for (unsigned int i = 0; i < hist.size(); i++)
+    {
+        const auto& inter = hist[i];
+        buf << '[' << inter.timestamp << "] Question: " << inter.question << '\n'
+            << "Answer: " << inter.answer << "\n\n";
+
+        for (const auto& cmd : inter.shell)
+        {
+            buf << '[' << cmd.execution_start << "] " << cmd.command << '\n'
+                << cmd.output << '\n'
+                << "[exit code: " << cmd.exit_code
+                << ", finished " << cmd.execution_end << "]\n\n";
+        }
+        buf << "----------------------------------------\n";
+    }
+    return buf.str();
+}
+
 // Wrapper prep function for request for agent
-std::string AgencyRequestWrapper::ask_agent(const std::string& url, const std::string& user_query, std::vector<std::pair<std::string, std::string>> &session_history) {
-    json response = send_request_to_agent_server(url, user_query, session_history);
+std::string AgencyRequestWrapper::ask_agent(const std::string& url, std::string user_query, bool include_session_history) {
+    json response = send_request_to_agent_server(url, user_query, include_session_history);
 
     const json response_body = response["body"];
 
     if (response_body.contains("error")) {
-        std::cerr << "Request failed: " << response_body["error"] << std::endl;
+//        std::cerr << "Request failed: " << response_body["error"] << std::endl;
         return "";
     }
 
@@ -147,12 +169,4 @@ json AgencyRequestWrapper::make_http_request(const HttpRequestType request_type,
 
 char *AgencyRequestWrapper::getenv(const char *key) {
     return std::getenv(key);
-}
-
-std::string AgencyRequestWrapper::get_session_history_string(std::vector<std::pair<std::string, std::string>> &session_history) {
-    std::ostringstream history_stream;
-    for (const auto &[fst, snd] : session_history) {
-        history_stream << "Query: " << fst << "\nAnswer: " << snd << "\n";
-    }
-    return history_stream.str();
 }

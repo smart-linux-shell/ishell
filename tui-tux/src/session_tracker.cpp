@@ -1,8 +1,11 @@
 #include "session_tracker.hpp"
 #include <iostream>
+#include <vector>
+#include <iomanip>
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 
 SessionTracker& SessionTracker::get() {
     static SessionTracker instance;
@@ -10,8 +13,7 @@ SessionTracker& SessionTracker::get() {
 }
 
 SessionTracker::SessionTracker()
-    : db(nullptr), sessionDbId(-1), lastInteractionId(-1), lastCommandId(-1),
-      currentCommandText(""), currentCommandOutput("") {
+    : db(nullptr), sessionDbId(-1), lastCommandId(-1) {
     openLogFile();
 }
 
@@ -30,10 +32,9 @@ void SessionTracker::startSession() {
         sessionDbId = sqlite3_last_insert_rowid(db);
     }
 
-    lastInteractionId = -1;
     lastCommandId = -1;
-    currentCommandText.clear();
-    currentCommandOutput.clear();
+
+    this->logAgentInteraction("Hello!", "Hello! How can I assist you with your Linux shell commands today? How can I assist you today?");
 }
 
 void SessionTracker::endSession() {
@@ -47,10 +48,7 @@ void SessionTracker::endSession() {
     sqlite3_close(db);
     db = nullptr;
     sessionDbId = -1;
-    lastInteractionId = -1;
     lastCommandId = -1;
-    currentCommandText.clear();
-    currentCommandOutput.clear();
 }
 
 void SessionTracker::openLogFile() {
@@ -93,9 +91,6 @@ void SessionTracker::logAgentInteraction(const std::string& question, const std:
 
     if (sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr) != SQLITE_OK) {
         std::cerr << "DB insert interaction failed: " << sqlite3_errmsg(db) << std::endl;
-        lastInteractionId = -1;
-    } else {
-        lastInteractionId = sqlite3_last_insert_rowid(db);
     }
 
     sqlite3_free(escapedQuestion);
@@ -107,8 +102,20 @@ void SessionTracker::addNewCommand(EventType command_type) {
 
     bool is_shell_command = (command_type == EventType::ShellCommand);
 
-    std::string sql = "INSERT INTO commands (interaction_id, command_text, shell_command) VALUES (" +
-                     (lastInteractionId > 0 ? std::to_string(lastInteractionId) : "NULL") +
+    auto callback = [](void *data, int argc, char **argv, char **) -> int {
+        int *pmax = static_cast<int*>(data);
+        *pmax = argv[0] ? std::atoi(argv[0]) : 0;
+        return 0;
+    };
+
+    int last_interaction_id = 0;
+    std::string sql = "SELECT MAX(interaction_id) AS max_id FROM interactions;";
+    if (sqlite3_exec(db, sql.c_str(), callback, &last_interaction_id, nullptr) != SQLITE_OK) {
+        std::cerr << "Error selecting max interaction_id\n";
+    }
+
+    sql = "INSERT INTO commands (interaction_id, command_text, shell_command) VALUES (" +
+                     (last_interaction_id > 0 ? std::to_string(last_interaction_id) : "NULL") +
                      ", '', " + 
                      (is_shell_command ? "1" : "0") + 
                      ");";
@@ -118,20 +125,13 @@ void SessionTracker::addNewCommand(EventType command_type) {
         lastCommandId = -1;
     } else {
         lastCommandId = sqlite3_last_insert_rowid(db);
-        currentCommandText.clear();
-        currentCommandOutput.clear();
     }
 }
 
 void SessionTracker::appendCommandText(const std::string& text) {
     if (!db || lastCommandId == -1) return;
 
-    if (!currentCommandText.empty()) {
-        currentCommandText += "\n";
-    }
-    currentCommandText += text;
-
-    char *escapedText = sqlite3_mprintf("%q", currentCommandText.c_str());
+    char *escapedText = sqlite3_mprintf("%q", text.c_str());
 
     std::string sql = "UPDATE commands SET command_text = '" + std::string(escapedText) + 
                      "' WHERE command_id = " + std::to_string(lastCommandId) + ";";
@@ -145,8 +145,6 @@ void SessionTracker::appendCommandText(const std::string& text) {
 
 void SessionTracker::setCommandOutput(const std::string& output) {
     if (!db || lastCommandId == -1) return;
-
-    currentCommandOutput = output;
 
     char *escapedOutput = sqlite3_mprintf("%q", output.c_str());
 
@@ -170,12 +168,91 @@ void SessionTracker::setExitCode(int exit_code) {
     if (sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr) != SQLITE_OK) {
         std::cerr << "Failed to update command exit code: " << sqlite3_errmsg(db) << std::endl;
     }
-
-    if (exit_code == 0 && lastInteractionId > 0) {
-        sql = "UPDATE interactions SET resolved = 1 WHERE interaction_id = " + std::to_string(lastInteractionId);
-        if (sqlite3_exec(db, sql.c_str(), nullptr, nullptr, nullptr) != SQLITE_OK) {
-            std::cerr << "Failed to mark interaction as resolved: " << sqlite3_errmsg(db) << std::endl;
-        }
-    }
 }
 
+//----------------------------------------- get methods ------------------------------------------
+
+const std::vector<SessionTracker::Interaction>& SessionTracker::get_history() const {
+    history.clear();
+    if (!db || sessionDbId <= 0)
+        return history;
+
+    std::unordered_map<int, std::size_t> rowOf;
+    char* err = nullptr;
+
+    const std::string sqlInts =
+        "SELECT interaction_id, timestamp, agent_question, agent_message "
+        "FROM interactions "
+        "WHERE session_id = " + std::to_string(sessionDbId) + " "
+        "ORDER BY interaction_id ASC;";
+
+    auto intsCB = [](void* ctx, int n, char** row, char**) -> int
+    {
+        using Pair = std::pair<std::vector<Interaction>*, std::unordered_map<int,std::size_t>*>;
+        auto* p   = static_cast<Pair*>(ctx);
+        auto& vec = *p->first;
+        auto& map = *p->second;
+        if (n < 4) return 0;
+
+        Interaction inter;
+        inter.interaction_id = std::atoi(row[0]);
+        inter.timestamp      = row[1] ? row[1] : "";
+        inter.question       = row[2] ? row[2] : "";
+        inter.answer         = row[3] ? row[3] : "";
+
+        map[inter.interaction_id] = vec.size();
+        vec.push_back(std::move(inter));
+        return 0;
+    };
+
+    std::pair<std::vector<Interaction>*, std::unordered_map<int,std::size_t>*> ctxInts{&history, &rowOf};
+    if (sqlite3_exec(db, sqlInts.c_str(), intsCB, &ctxInts, &err) != SQLITE_OK)
+    {
+        if (err) sqlite3_free(err);
+        return history;
+    }
+
+    if (history.empty())
+        return history;
+
+    // shell commands
+    const std::string sqlCmds =
+        "SELECT interaction_id, command_text, output, "
+        "       execution_start, execution_end, exit_code "
+        "FROM commands "
+        "WHERE shell_command = 1 "
+        "  AND interaction_id IN ("
+        "        SELECT interaction_id "
+        "        FROM interactions "
+        "        WHERE session_id = " + std::to_string(sessionDbId) + ") "
+        "ORDER BY interaction_id ASC, command_id ASC;";
+
+    auto cmdsCB = [](void* ctx, int n, char** row, char**) -> int
+    {
+        using Pair = std::pair<std::vector<Interaction>*, std::unordered_map<int,std::size_t>*>;
+        auto* p   = static_cast<Pair*>(ctx);
+        auto& vec = *p->first;
+        auto& map = *p->second;
+        if (n < 6) return 0;
+
+        const int id = std::atoi(row[0]);
+        auto pos = map.find(id);
+        if (pos == map.end()) return 0;
+
+        ShellCmd cmd;
+        cmd.interaction_id   = id;
+        cmd.command          = row[1] ? row[1] : "";
+        cmd.output           = row[2] ? row[2] : "";
+        cmd.execution_start  = row[3] ? row[3] : "";
+        cmd.execution_end    = row[4] ? row[4] : "";
+        cmd.exit_code        = row[5] ? std::atoi(row[5]) : 0;
+
+        vec[pos->second].shell.push_back(std::move(cmd));
+        return 0;
+    };
+
+    sqlite3_exec(db, sqlCmds.c_str(), cmdsCB, &ctxInts, &err);
+    if (err) sqlite3_free(err);
+
+    return history;
+}
