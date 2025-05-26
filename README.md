@@ -7,7 +7,7 @@ This project is a dual-pane Linux terminal designed to enhance the user experien
 
 ### Contributors
 
-This project was part of a Research Internship at Jetbrains. It was collaboratively developed by:  
+This project was part of a Research Internship at Jetbrains (Neapolis University Pafos Bachelor Program). It was collaboratively developed by:  
   - [Iulian Alexa](https://github.com/iulianalexa), 
   - [Milica Sladaković](https://github.com/coma007),  
 
