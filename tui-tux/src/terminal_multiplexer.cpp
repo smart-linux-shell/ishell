@@ -525,8 +525,17 @@ int TerminalMultiplexer::handle_screen_output(Screen &screen, const int fd) {
                             if(bash_waiting_for_prompt) break;
                             std::string cmd = "";
                             for (int i = first_command_line; i <= last_command_line; i++) {
-                                cmd += screen.get_line(i);
-                                cmd += "\n";
+                                std::string line = screen.get_line(i);
+                                auto endpos = line.find_last_not_of(' ');
+                                if (endpos != std::string::npos) {
+                                    line = line.substr(0, endpos + 1);
+                                } else {
+                                    line.clear();
+                                }
+                                cmd += line;
+                                if(i != last_command_line){
+                                    cmd += "\n";
+                                }
                             }
                             SessionTracker::get().addNewCommand(SessionTracker::EventType::ShellCommand);
                             SessionTracker::get().appendCommandText(cmd);

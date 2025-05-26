@@ -81,7 +81,7 @@ json AgencyRequestWrapper::send_request_to_agent_server(const std::string& url, 
     std::string ssh_user = get_ssh_user();
 	std::string history = "";
 	if(include_session_history){
-    	std::string history = get_session_history_string();
+    	history = get_session_history_string();
 	}
 
     if(context.size() > 0){
@@ -124,7 +124,7 @@ std::string AgencyRequestWrapper::get_session_history_string() {
     for (unsigned int i = 0; i < hist.size(); i++)
     {
         const auto& inter = hist[i];
-        buf << '[' << inter.timestamp << "] Question: " << inter.question << '\n'
+        buf << '[' << inter.timestamp << "] Query: " << inter.question << '\n'
             << "Answer: " << inter.answer << "\n\n";
 
         for (const auto& cmd : inter.shell)
